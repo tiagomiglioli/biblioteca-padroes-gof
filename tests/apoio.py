@@ -28,5 +28,5 @@ def livro_no_banco(fabrica, livro_id="L1"):
 
 
 def emprestar(sistema, estudante_id="E1", livro_id="L1"):
-    sistema.fachada.reservar(estudante_id, livro_id)
-    return sistema.fachada.emprestar(estudante_id, livro_id)
+    sistema.fachada.reservar(estudante_id, livro_id, atendente_id="A1")
+    return sistema.fachada.emprestar(estudante_id, livro_id, atendente_id="A1")

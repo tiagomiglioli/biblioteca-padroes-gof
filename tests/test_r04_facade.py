@@ -20,23 +20,23 @@ def emprestimo_aberto(fabrica, livro_id="L1"):
 
 def test_r04_emprestimo_valida_reserva_remove_reserva_cria_emprestimo_e_atualiza_livro(fabrica):
     sistema = sistema_pronto(fabrica)
-    sistema.fachada.reservar("E1", "L1")
+    sistema.fachada.reservar("E1", "L1", atendente_id="A1")
     assert reserva_ativa(fabrica) is not None
 
-    comprovante = sistema.fachada.emprestar("E1", "L1")
+    comprovante = sistema.fachada.emprestar("E1", "L1", atendente_id="A1")
 
     assert reserva_ativa(fabrica) is None
     assert emprestimo_aberto(fabrica).estudante_id == "E1"
     assert livro_no_banco(fabrica).nome_estado == "EMPRESTADO"
     assert comprovante == Comprovante("emprestimo", "L1", "E1", "EMPRESTADO",
-                                      HOJE + timedelta(days=30), comprovante.mensagem)
+                                      HOJE + timedelta(days=30), comprovante.mensagem, atendente_id="A1")
 
 
 def test_r04_fachada_devolve_comprovantes_e_nao_colecoes(fabrica):
     sistema = sistema_pronto(fabrica)
-    resultados = [sistema.fachada.reservar("E1", "L1"), sistema.fachada.consultar_reserva("E1", "L1"),
-                  sistema.fachada.emprestar("E1", "L1"), sistema.fachada.renovar("E1", "L1"),
-                  sistema.fachada.devolver("L1", HOJE), sistema.fachada.inspecionar("L1", True)]
+    resultados = [sistema.fachada.reservar("E1", "L1", atendente_id="A1"), sistema.fachada.consultar_reserva("E1", "L1"),
+                  sistema.fachada.emprestar("E1", "L1", atendente_id="A1"), sistema.fachada.renovar("E1", "L1"),
+                  sistema.fachada.devolver("L1", HOJE, atendente_id="A1"), sistema.fachada.inspecionar("L1", True)]
 
     for resultado in resultados:
         assert isinstance(resultado, Comprovante)
@@ -46,10 +46,10 @@ def test_r04_fachada_devolve_comprovantes_e_nao_colecoes(fabrica):
 
 def test_r04_emprestimo_exige_reserva_do_mesmo_estudante(fabrica):
     sistema = sistema_pronto(fabrica)
-    sistema.fachada.reservar("E1", "L1")
+    sistema.fachada.reservar("E1", "L1", atendente_id="A1")
 
     with pytest.raises(ErroDominio):
-        sistema.fachada.emprestar("E2", "L1")
+        sistema.fachada.emprestar("E2", "L1", atendente_id="A1")
 
     assert reserva_ativa(fabrica) is not None
     assert livro_no_banco(fabrica).nome_estado == "RESERVADO"
@@ -80,11 +80,11 @@ class _FabricaComFalha:
 
 
 def test_r04_falha_no_meio_do_emprestimo_desfaz_tudo(fabrica):
-    sistema_pronto(fabrica).fachada.reservar("E1", "L1")
+    sistema_pronto(fabrica).fachada.reservar("E1", "L1", atendente_id="A1")
     sistema_com_falha = sistema_pronto(_FabricaComFalha(fabrica))
 
     with pytest.raises(RuntimeError):
-        sistema_com_falha.fachada.emprestar("E1", "L1")
+        sistema_com_falha.fachada.emprestar("E1", "L1", atendente_id="A1")
 
     assert reserva_ativa(fabrica) is not None            # a reserva removida voltou
     assert emprestimo_aberto(fabrica) is None
@@ -94,9 +94,9 @@ def test_r04_falha_no_meio_do_emprestimo_desfaz_tudo(fabrica):
 def test_r04_reserva_exige_livro_e_estudante_cadastrados(fabrica):
     sistema = sistema_pronto(fabrica)
     with pytest.raises(ErroDominio):
-        sistema.fachada.reservar("E1", "NAO-EXISTE")
+        sistema.fachada.reservar("E1", "NAO-EXISTE", atendente_id="A1")
     with pytest.raises(ErroDominio):
-        sistema.fachada.reservar("NAO-EXISTE", "L1")
+        sistema.fachada.reservar("NAO-EXISTE", "L1", atendente_id="A1")
     assert livro_no_banco(fabrica).nome_estado == "LIVRE"
 
 
@@ -113,10 +113,10 @@ def test_r04_renovacao_exige_emprestimo_do_mesmo_estudante(fabrica):
 def test_r04_tratadores_delegam_a_fachada(fabrica):
     sistema = sistema_pronto(fabrica)
 
-    sistema.emprestimo.solicitar_reserva("E1", "L1", autor="ana")
+    sistema.emprestimo.solicitar_reserva("E1", "L1", autor="ana", atendente_id="A1")
     assert sistema.emprestimo.consultar_reserva("E1", "L1").estado == "RESERVADO"
-    assert sistema.emprestimo.realizar_emprestimo("E1", "L1").estado == "EMPRESTADO"
+    assert sistema.emprestimo.realizar_emprestimo("E1", "L1", atendente_id="A1").estado == "EMPRESTADO"
     assert sistema.emprestimo.renovar_emprestimo("E1", "L1", autor="ana").estado == "RENOVADO"
-    assert sistema.devolucao.registrar_devolucao("L1", HOJE).estado == "DEVOLVIDO"
+    assert sistema.devolucao.registrar_devolucao("L1", HOJE, atendente_id="A1").estado == "DEVOLVIDO"
     assert sistema.devolucao.inspecionar("L1", bom_estado=False).estado == "REPARANDO"
     assert sistema.devolucao.registrar_laudo_irrecuperavel("L1").estado == "INCINERADO"

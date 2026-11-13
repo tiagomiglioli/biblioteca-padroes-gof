@@ -135,13 +135,14 @@ class AcervoMySQL(_RepositorioMySQL, Acervo):
 class MovimentacaoMySQL(_RepositorioMySQL, Movimentacao):
     """GoF Abstract Factory — ProdutoConcreto (MySQL): repositório de Movimentacao."""
 
-    def inserir_reserva(self, livro_id, estudante_id, data):
-        novo_id = self._executar("INSERT INTO reserva (livro_id, estudante_id, data) VALUES (%s, %s, %s)",
-                                 (livro_id, estudante_id, data))[1]
-        return Reserva(novo_id, livro_id, estudante_id, data)
+    def inserir_reserva(self, livro_id, estudante_id, data, atendente_id):
+        novo_id = self._executar("INSERT INTO reserva (livro_id, estudante_id, data, atendente_id)"
+                                 " VALUES (%s, %s, %s, %s)",
+                                 (livro_id, estudante_id, data, atendente_id))[1]
+        return Reserva(novo_id, livro_id, estudante_id, data, atendente_id)
 
     def consultar_reserva(self, livro_id, estudante_id):
-        linha = self._linha("SELECT id, livro_id, estudante_id, data FROM reserva"
+        linha = self._linha("SELECT id, livro_id, estudante_id, data, atendente_id, ativa FROM reserva"
                             " WHERE livro_id = %s AND estudante_id = %s AND ativa = 1",
                             (livro_id, estudante_id))
         return Reserva(*linha) if linha else None
@@ -149,18 +150,20 @@ class MovimentacaoMySQL(_RepositorioMySQL, Movimentacao):
     def remover_reserva(self, reserva_id):
         self._executar("UPDATE reserva SET ativa = 0 WHERE id = %s", (reserva_id,))
 
-    def inserir_emprestimo(self, livro_id, estudante_id, data):
-        novo_id = self._executar("INSERT INTO emprestimo (livro_id, estudante_id, data_emprestimo)"
-                                 " VALUES (%s, %s, %s)", (livro_id, estudante_id, data))[1]
-        return Emprestimo(novo_id, livro_id, estudante_id, data)
+    def inserir_emprestimo(self, livro_id, estudante_id, data, atendente_id):
+        novo_id = self._executar("INSERT INTO emprestimo (livro_id, estudante_id, data_emprestimo, atendente_id)"
+                                 " VALUES (%s, %s, %s, %s)", (livro_id, estudante_id, data, atendente_id))[1]
+        return Emprestimo(novo_id, livro_id, estudante_id, data, atendente_id=atendente_id)
 
     def consultar_emprestimo(self, livro_id):
-        linha = self._linha("SELECT id, livro_id, estudante_id, data_emprestimo, data_devolucao"
+        linha = self._linha("SELECT id, livro_id, estudante_id, data_emprestimo, data_devolucao,"
+                            " atendente_id, atendente_devolucao_id"
                             " FROM emprestimo WHERE livro_id = %s AND data_devolucao IS NULL", (livro_id,))
         return Emprestimo(*linha) if linha else None
 
-    def registrar_devolucao(self, emprestimo_id, data):
-        self._executar("UPDATE emprestimo SET data_devolucao = %s WHERE id = %s", (data, emprestimo_id))
+    def registrar_devolucao(self, emprestimo_id, data, atendente_id):
+        self._executar("UPDATE emprestimo SET data_devolucao = %s, atendente_devolucao_id = %s WHERE id = %s",
+                       (data, atendente_id, emprestimo_id))
 
     def registrar_comando(self, comando_id, tipo, autor, criado_em):
         # A PRIMARY KEY decide: se outra transação já gravou este id (mesmo ao mesmo tempo),
@@ -201,11 +204,18 @@ class RelacionamentoMySQL(_RepositorioMySQL, Relacionamento):
     def inserir_estudante(self, estudante):
         self._executar("INSERT INTO estudante (id, cpf) VALUES (%s, %s)", (estudante.id, estudante.cpf))
 
-    def obter_estudante(self, estudante_id):
-        linha = self._linha("SELECT id, cpf FROM estudante WHERE id = %s", (estudante_id,))
+    def obter_estudante(self, estudante_id, para_atualizar=False):
+        trava = " FOR UPDATE" if para_atualizar else ""
+        linha = self._linha(f"SELECT id, cpf FROM estudante WHERE id = %s{trava}", (estudante_id,))
         return Estudante(*linha) if linha else None
 
     def atualizar_estudante(self, estudante):
+        atual = self.obter_estudante(estudante.id, para_atualizar=True)
+        if atual and atual.cpf != estudante.cpf and any(
+            self._linha(f"SELECT id FROM {tabela} WHERE estudante_id = %s LIMIT 1 FOR UPDATE", (estudante.id,))
+            for tabela in ("reserva", "emprestimo", "multa")
+        ):
+            raise ErroDominio("Não é permitido trocar a Pessoa de estudante com movimentações.")
         self._executar("UPDATE estudante SET cpf = %s WHERE id = %s", (estudante.cpf, estudante.id))
 
     def excluir_estudante(self, estudante_id):
@@ -217,11 +227,19 @@ class RelacionamentoMySQL(_RepositorioMySQL, Relacionamento):
     def inserir_atendente(self, atendente):
         self._executar("INSERT INTO atendente (id, cpf) VALUES (%s, %s)", (atendente.id, atendente.cpf))
 
-    def obter_atendente(self, atendente_id):
-        linha = self._linha("SELECT id, cpf FROM atendente WHERE id = %s", (atendente_id,))
+    def obter_atendente(self, atendente_id, para_atualizar=False):
+        trava = " FOR UPDATE" if para_atualizar else ""
+        linha = self._linha(f"SELECT id, cpf FROM atendente WHERE id = %s{trava}", (atendente_id,))
         return Atendente(*linha) if linha else None
 
     def atualizar_atendente(self, atendente):
+        atual = self.obter_atendente(atendente.id, para_atualizar=True)
+        if atual and atual.cpf != atendente.cpf and (
+            self._linha("SELECT id FROM reserva WHERE atendente_id = %s LIMIT 1 FOR UPDATE", (atendente.id,))
+            or self._linha("SELECT id FROM emprestimo WHERE atendente_id = %s OR atendente_devolucao_id = %s"
+                           " LIMIT 1 FOR UPDATE", (atendente.id, atendente.id))
+        ):
+            raise ErroDominio("Não é permitido trocar a Pessoa de atendente com movimentações.")
         self._executar("UPDATE atendente SET cpf = %s WHERE id = %s", (atendente.cpf, atendente.id))
 
     def excluir_atendente(self, atendente_id):
@@ -252,8 +270,9 @@ class FinanceiroMySQL(_RepositorioMySQL, Financeiro):
     def _buscar(self, condicao, parametros):
         return _multa(self._linha(f"SELECT {COLUNAS_MULTA} FROM multa WHERE {condicao}", parametros))
 
-    def obter_multa(self, multa_id):
-        return self._buscar("id = %s", (multa_id,))
+    def obter_multa(self, multa_id, para_atualizar=False):
+        bloqueio = " FOR UPDATE" if para_atualizar else ""
+        return self._buscar("id = %s" + bloqueio, (multa_id,))
 
     def obter_multa_do_emprestimo(self, emprestimo_id):
         return self._buscar("emprestimo_id = %s", (emprestimo_id,))

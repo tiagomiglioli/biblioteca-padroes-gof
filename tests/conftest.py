@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from dominio.configuracao_singleton import ConfiguracaoSistema
 from dominio.persistencia_factory import FabricaMemoria, FabricaMySQL
 from persistencia.mysql import executar_arquivo_sql
+from persistencia.migracoes import migrar_atendentes
 
 load_dotenv()
 
@@ -22,12 +23,15 @@ TABELAS = ["comando_executado", "quitacao", "multa", "emprestimo", "reserva", "l
 
 def parametros_mysql_teste():
     """Banco SEPARADO do de demonstração: os testes apagam todas as tabelas dele."""
+    banco = os.environ.get("MYSQL_TEST_DATABASE", "biblioteca_gof_teste")
+    if banco.casefold() == os.environ.get("MYSQL_DATABASE", "biblioteca_gof").casefold():
+        raise ValueError("MYSQL_TEST_DATABASE deve ser diferente de MYSQL_DATABASE.")
     return {
         "host": os.environ.get("MYSQL_HOST", "127.0.0.1"),
         "port": int(os.environ.get("MYSQL_PORT", "3306")),
         "user": os.environ.get("MYSQL_USER", ""),
         "password": os.environ.get("MYSQL_PASSWORD", ""),
-        "database": os.environ.get("MYSQL_TEST_DATABASE", "biblioteca_gof_teste"),
+        "database": banco,
     }
 
 
@@ -38,8 +42,11 @@ def mysql_preparado():
     parametros = parametros_mysql_teste()
     try:
         executar_arquivo_sql({**parametros, "connection_timeout": 3}, RAIZ / "sql" / "schema.sql")
+        migrar_atendentes({**parametros, "connection_timeout": 3})
     except mysql.connector.Error as erro:
-        pytest.skip(f"MySQL indisponível para testes de integração: {erro.msg}")
+        if erro.errno in (2002, 2003, 2005):
+            pytest.skip(f"MySQL indisponível para testes de integração (código {erro.errno}).")
+        raise
     return parametros
 
 

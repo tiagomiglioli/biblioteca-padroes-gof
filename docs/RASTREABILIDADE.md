@@ -2,8 +2,7 @@
 
 Para cada requisito: o padrão, as classes que fazem cada papel, os testes que comprovam o
 cenário de verificação e o diagrama correspondente. Os diagramas auxiliares estão em
-`docs/DIAGRAMAS_UML.md`; o arquivo Astah da equipe ainda precisa receber os diagramas dos
-padrões (ver a seção "Pendências" daquele arquivo).
+`docs/DIAGRAMAS_UML.md`; os modelos ficaram fora do escopo de avaliação por solicitação da equipe. As referências históricas a modelos abaixo não são critérios de aprovação deste fechamento.
 
 | Nº | Situação | Padrão | Papéis → classes | Arquivo | Testes do cenário de verificação | UML |
 |---|---|---|---|---|---|---|
@@ -50,3 +49,19 @@ padrões (ver a seção "Pendências" daquele arquivo).
 | T10 | REPARANDO | retornarDoReparo | LIVRE | `EstadoReparando.retornar_do_reparo` |
 | T11 | LIVRE | excluirLivro | fim | `EstadoLivre.excluir` (chamado por `TratadorDeAcervo.excluir`) |
 | — | REPARANDO | laudo irrecuperável | INCINERADO | `EstadoReparando.registrar_laudo_irrecuperavel` |
+
+## Fechamento do requisito herdado — participantes das transações
+
+| Regra | Implementação | Teste correspondente |
+|---|---|---|
+| Atendente presente/cadastrado e Pessoa distinta do estudante | `CirculacaoFacade._validar_participantes`, chamada por `reservar`, `emprestar`, `devolver` | `tests/test_atendente_transacoes.py::test_atendente_invalido_recusa_sem_mudar_livro`, `test_omitir_atendente_nao_cria_reserva` |
+| Seleção na interface e comprovante com responsável | `web/rotas.py`, formulário Circulação, `Comprovante.atendente_id` | `tests/test_atendente_transacoes.py::test_web_exige_atendente_e_mostra_responsavel` |
+| Responsáveis separados nas três etapas, reserva inativa preservada | `Reserva.atendente_id`, `Emprestimo.atendente_id`, `Emprestimo.atendente_devolucao_id`, repositórios memória/MySQL | `test_responsavel_de_cada_operacao_nao_sobrescreve_o_anterior`, `tests/test_persistencia_atendente.py::test_responsaveis_distintos_persistem_e_reserva_vira_historico` |
+| Falha não consome Command e não muda histórico | `ExecutorComandos`, Facade e UoW | `test_reserva_sem_atendente_faz_rollback_do_command_e_permite_corrigir`, `test_rollback_preserva_reserva_e_responsavel` |
+| Preservação da identidade dos papéis usados | Relacionamento memória/MySQL recusa exclusão ou troca de CPF após uso | `tests/test_persistencia_atendente.py::test_papel_usado_nao_pode_trocar_pessoa`; teste de responsáveis também verifica exclusão |
+| Compatibilidade com comprovante legado | Campo opcional em `Comprovante.de_texto` | `tests/test_persistencia_atendente.py::test_comprovante_antigo_permanece_legivel` |
+| Migração aditiva, repetível e retomável; legado NULL sem responsável inventado | `persistencia/migracoes.py`, `app.py` comandos `migrar-db`/`init-db`, `sql/schema.sql` | `tests/test_migracao_atendente.py::test_migracao_preserva_legado_e_pode_ser_repetida` |
+
+O autor do Command é o login do operador; não se confunde com atendente selecionado. A renovação conserva o responsável do empréstimo. Os limites dos campos são validados no backend; não foi introduzido RBAC. Migração deve preceder esta versão e ser executada serialmente, com a anterior parada.
+
+Total final da suíte: **374 aprovados**, zero falhas/erros/skips: 28,22 s na cópia de fechamento e 36,29 s no original após aplicação. O parecer **APTO — PODE ENTREGAR** refere-se ao escopo acadêmico auditado, com Astah excluído. Evidências em `AUDITORIA_FINAL.md`, `EVIDENCIAS_TESTES.md` e `evidencias_fechamento/`. Os resultados da auditoria inicial pertencem ao estado anterior e foram preservados como histórico; a suíte não certifica domínio oral dos integrantes.

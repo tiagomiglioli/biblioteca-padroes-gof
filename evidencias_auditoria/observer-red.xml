@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="2" time="0.138" timestamp="2026-11-13T11:53:00.234862-03:00" hostname="Tiagos-MacBook-Air.local"><testcase classname="tests.test_auditoria_observer" name="test_reentrega_concorrente_nao_duplica_ouvintes[memoria]" time="0.003"><failure message="AssertionError: assert ['L1', 'L1', ...1', 'L1', ...] == ['L1']&#10;  &#10;  Left contains 8 more items, first extra item: 'L1'&#10;  Use -v to get more diff">fabrica = &lt;dominio.persistencia_factory.FabricaMemoria object at 0x107595400&gt;
+
+    def test_reentrega_concorrente_nao_duplica_ouvintes(fabrica):
+        sistema = sistema_pronto(fabrica)
+        emprestar(sistema)
+        eventos = []
+    
+        class Coletor(OuvinteDevolucao):
+            def notificar(self, evento):
+                eventos.append(evento)
+    
+        sistema.publicador.registrar(Coletor())
+        sistema.fachada.devolver("L1", HOJE + timedelta(days=35))
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            list(pool.map(sistema.publicador.publicar, [eventos[0]] * 8))
+&gt;       assert sistema.inspecao.pendentes == ["L1"]
+E       AssertionError: assert ['L1', 'L1', ...1', 'L1', ...] == ['L1']
+E         
+E         Left contains 8 more items, first extra item: 'L1'
+E         Use -v to get more diff
+
+tests/test_auditoria_observer.py:22: AssertionError</failure></testcase><testcase classname="tests.test_auditoria_observer" name="test_reentrega_tenta_novamente_apenas_ouvinte_que_falhou[memoria]" time="0.002"><failure message="AssertionError: assert 3 == 2&#10; +  where 3 = len([EventoDevolucao(emprestimo_id=2, livro_id='L1', estudante_id='E1', cpf='11122233344', email='ana@exemplo.com', vencim...122233344', email='ana@exemplo.com', vencimento=datetime.date(2026, 12, 1), data_devolucao=datetime.date(2026, 12, 1))])">fabrica = &lt;dominio.persistencia_factory.FabricaMemoria object at 0x107572e90&gt;
+
+    def test_reentrega_tenta_novamente_apenas_ouvinte_que_falhou(fabrica):
+        sistema = sistema_pronto(fabrica)
+        emprestar(sistema)
+        eventos = []
+    
+        class Instavel(OuvinteDevolucao):
+            def notificar(self, evento):
+                eventos.append(evento)
+                if len(eventos) == 1:
+                    raise ConnectionError("falha transitória antes do efeito")
+    
+        sistema.publicador.registrar(Instavel())
+        sistema.fachada.devolver("L1", HOJE + timedelta(days=30))
+        sistema.publicador.publicar(eventos[0])
+        sistema.publicador.publicar(eventos[0])
+&gt;       assert len(eventos) == 2
+E       AssertionError: assert 3 == 2
+E        +  where 3 = len([EventoDevolucao(emprestimo_id=2, livro_id='L1', estudante_id='E1', cpf='11122233344', email='ana@exemplo.com', vencim...122233344', email='ana@exemplo.com', vencimento=datetime.date(2026, 12, 1), data_devolucao=datetime.date(2026, 12, 1))])
+
+tests/test_auditoria_observer.py:45: AssertionError</failure></testcase></testsuite></testsuites>

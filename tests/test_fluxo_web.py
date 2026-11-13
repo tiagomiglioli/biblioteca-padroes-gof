@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 
 from app import criar_app
-from tests.apoio import ANA, HOJE, livro_no_banco
+from tests.apoio import ANA, BIA, HOJE, livro_no_banco
 from tests.test_autenticacao import CONFIG_TESTE, SENHA
 
 
@@ -33,6 +33,8 @@ def enviar(cliente, rota, **dados):
 
 def cadastrar_basico(cliente):
     enviar(cliente, "/cadastros/pessoa", acao="inserir", **ANA)
+    enviar(cliente, "/cadastros/pessoa", acao="inserir", **BIA)
+    enviar(cliente, "/cadastros/atendente", acao="inserir", id="A1", cpf=BIA["cpf"])
     enviar(cliente, "/cadastros/estudante", acao="inserir", id="E1", cpf=ANA["cpf"])
     enviar(cliente, "/cadastros/livro", acao="inserir", id="L1", titulo="Padrões de Projeto")
 
@@ -40,6 +42,7 @@ def cadastrar_basico(cliente):
 def circular(cliente, operacao, **dados):
     dados.setdefault("livro_id", "L1")
     dados.setdefault("estudante_id", "E1")
+    dados.setdefault("atendente_id", "A1")
     dados.setdefault("id_solicitacao", str(uuid.uuid4()))
     return enviar(cliente, "/circulacao", operacao=operacao, **dados)
 

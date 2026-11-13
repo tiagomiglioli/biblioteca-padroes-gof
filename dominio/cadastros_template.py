@@ -13,9 +13,16 @@ class ResultadoCadastro:
     ja_existia: bool
 
 
+LIMITES_CAMPOS = {"id": 20, "titulo": 200, "nome": 80, "sobrenome": 80, "email": 120}
+
+
 def campo(dados, nome):
     """Texto do formulário sem espaços nas pontas ('' se ausente)."""
-    return str(dados.get(nome, "")).strip()
+    valor = str(dados.get(nome, "")).strip()
+    limite = LIMITES_CAMPOS.get(nome)
+    if limite is not None and len(valor) > limite:
+        raise ErroDominio(f"O campo {nome} aceita no máximo {limite} caracteres.")
+    return valor
 
 
 def campo_cpf(dados):

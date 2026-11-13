@@ -13,6 +13,7 @@ from dominio.configuracao_singleton import ConfiguracaoSistema
 from dominio.persistencia_factory import criar_fabrica
 from dominio.tratadores import montar_sistema
 from persistencia.mysql import executar_arquivo_sql
+from persistencia.migracoes import migrar_atendentes
 from web.autenticacao import configurar_login
 from web.rotas import paginas
 
@@ -62,7 +63,14 @@ def registrar_comandos(app):
     def init_db():
         """Cria o banco (se faltar) e as tabelas de sql/schema.sql."""
         executar_arquivo_sql(parametros_mysql(), RAIZ / "sql" / "schema.sql")
+        migrar_atendentes(parametros_mysql())
         click.echo("Banco e tabelas prontos.")
+
+    @app.cli.command("migrar-db")
+    def migrar_db():
+        """Atualiza uma base existente sem apagar ou atribuir responsáveis ao histórico."""
+        migrar_atendentes(parametros_mysql())
+        click.echo("Migração de responsáveis concluída; histórico preservado.")
 
     @app.cli.command("seed-demo")
     def seed_demo():

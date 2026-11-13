@@ -178,7 +178,10 @@ class TratadorDeAcervo(_TratadorBase, iLivro):
             livro.titulo = campo(dados, "titulo")
             acervo.atualizar(livro)
             return True
-        return self._no_acervo(operacao)
+        atualizado = self._no_acervo(operacao)
+        if atualizado:
+            self._consulta.invalidar(campo(dados, "id"))
+        return atualizado
 
     def excluir(self, livro_id):
         """Exclui o livro; o State só aceita excluir livro LIVRE (T11)."""
@@ -189,7 +192,10 @@ class TratadorDeAcervo(_TratadorBase, iLivro):
             livro.excluir()
             acervo.excluir(livro_id)
             return True
-        return self._no_acervo(operacao)
+        excluido = self._no_acervo(operacao)
+        if excluido:
+            self._consulta.invalidar(livro_id)
+        return excluido
 
     def listar(self):
         return self._no_acervo(lambda acervo: acervo.listar())
@@ -201,6 +207,7 @@ class TratadorDeAcervo(_TratadorBase, iLivro):
     def criar_grupo(self, nome, pai_id):
         """Cria unidade (pai_id None), seção ou subseção. Devolve o id do grupo."""
         exigir(nome.strip(), "Nome do grupo é obrigatório.")
+        exigir(len(nome.strip()) <= 100, "Nome do grupo aceita no máximo 100 caracteres.")
 
         def operacao(acervo):
             _, grupos, _ = montar_arvore(acervo.listar_grupos(), acervo.listar_itens())
@@ -234,18 +241,18 @@ class TratadorDeEmprestimo:
         self._fachada = fachada
         self._executor = executor
 
-    def solicitar_reserva(self, estudante_id, livro_id, autor, id_solicitacao=None):
+    def solicitar_reserva(self, estudante_id, livro_id, autor, id_solicitacao=None, atendente_id=None):
         """f1 — cria a solicitação (Command) e a encaminha ao executor."""
-        comando = ComandoReserva(self._fachada, estudante_id, livro_id, autor, id_solicitacao)
+        comando = ComandoReserva(self._fachada, estudante_id, livro_id, autor, id_solicitacao, atendente_id=atendente_id)
         return self._executor.executar(comando)
 
     def consultar_reserva(self, estudante_id, livro_id):
         """f2."""
         return self._fachada.consultar_reserva(estudante_id, livro_id)
 
-    def realizar_emprestimo(self, estudante_id, livro_id):
+    def realizar_emprestimo(self, estudante_id, livro_id, atendente_id=None):
         """f3."""
-        return self._fachada.emprestar(estudante_id, livro_id)
+        return self._fachada.emprestar(estudante_id, livro_id, atendente_id=atendente_id)
 
     def renovar_emprestimo(self, estudante_id, livro_id, autor, id_solicitacao=None):
         """f4 — cria a solicitação (Command) e a encaminha ao executor."""
@@ -260,9 +267,9 @@ class TratadorDeDevolucao:
         self._fachada = fachada
         self._servico_multa = servico_multa
 
-    def registrar_devolucao(self, livro_id, data_devolucao=None):
+    def registrar_devolucao(self, livro_id, data_devolucao=None, atendente_id=None):
         """f5."""
-        return self._fachada.devolver(livro_id, data_devolucao)
+        return self._fachada.devolver(livro_id, data_devolucao, atendente_id=atendente_id)
 
     def emitir_boleto_de_multa(self, multa_id):
         """f6 — segunda via: devolve a multa com o boleto já emitido (ou emite, se faltava)."""
@@ -324,6 +331,7 @@ class TratadorDeAcesso(_TratadorBase):
 
     def criar_usuario(self, login, senha):
         exigir(login.strip() and len(senha) >= 8, "Informe o login e uma senha de pelo menos 8 caracteres.")
+        exigir(len(login.strip()) <= 50, "Login aceita no máximo 50 caracteres.")
         usuario = Usuario(login.strip(), generate_password_hash(senha))
         self._no_relacionamento(lambda rel: rel.inserir_usuario(usuario))
 

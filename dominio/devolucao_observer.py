@@ -3,6 +3,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import date
+from threading import RLock
 
 registro = logging.getLogger("biblioteca")
 
@@ -40,21 +41,29 @@ class PublicadorDevolucao:
     def __init__(self):
         self._ouvintes = []
         self.falhas = []
+        self._entregues = set()
+        self._trava = RLock()
 
     def registrar(self, ouvinte):
         self._ouvintes.append(ouvinte)
 
     def publicar(self, evento):
         """Chamado pela fachada DEPOIS do commit da devolução."""
-        for ouvinte in self._ouvintes:
-            # Cada ouvinte é isolado: se um falhar (ex.: e-mail fora do ar), os outros
-            # ainda são avisados e a devolução, já confirmada, não é desfeita.
-            try:
-                ouvinte.notificar(evento)
-            except Exception as erro:
-                self.falhas.append((type(ouvinte).__name__, str(erro)))
-                registro.exception("Ouvinte %s falhou na devolução do livro %s",
-                                   type(ouvinte).__name__, evento.livro_id)
+        # shortcut: deduplicação local; usar registro persistido se houver fila entre processos.
+        with self._trava:
+            for indice, ouvinte in enumerate(self._ouvintes):
+                chave = (evento.emprestimo_id, indice)
+                if chave in self._entregues:
+                    continue
+                # Cada ouvinte é isolado: se um falhar (ex.: e-mail fora do ar), os outros
+                # ainda são avisados e a devolução, já confirmada, não é desfeita.
+                try:
+                    ouvinte.notificar(evento)
+                    self._entregues.add(chave)
+                except Exception as erro:
+                    self.falhas.append((type(ouvinte).__name__, str(erro)))
+                    registro.exception("Ouvinte %s falhou na devolução do livro %s",
+                                       type(ouvinte).__name__, evento.livro_id)
 
 
 class ServicoEmail:

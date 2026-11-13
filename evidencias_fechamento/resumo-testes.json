@@ -1,0 +1,30 @@
+{
+  "passed": 374,
+  "failed": 0,
+  "skipped": 0,
+  "classes": {
+    "tests.test_atendente_transacoes": 32,
+    "tests.test_auditoria_boleto": 4,
+    "tests.test_auditoria_cache": 6,
+    "tests.test_auditoria_integridade": 16,
+    "tests.test_auditoria_observer": 4,
+    "tests.test_auditoria_processos": 1,
+    "tests.test_autenticacao": 54,
+    "tests.test_fluxo_web": 18,
+    "tests.test_migracao_atendente": 2,
+    "tests.test_mysql_integracao": 8,
+    "tests.test_persistencia_atendente": 17,
+    "tests.test_r01_state": 59,
+    "tests.test_r02_strategy": 21,
+    "tests.test_r03_adapter": 17,
+    "tests.test_r04_facade": 14,
+    "tests.test_r05_observer": 16,
+    "tests.test_r06_command": 14,
+    "tests.test_r07_template_method": 12,
+    "tests.test_r08_abstract_factory": 10,
+    "tests.test_r09_decorator": 13,
+    "tests.test_r10_composite": 13,
+    "tests.test_r11_singleton": 5,
+    "tests.test_validacao_tamanhos": 18
+  }
+}

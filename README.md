@@ -135,3 +135,35 @@ Claude Fable 5.2**, a partir do enunciado, do Trabalho 02, dos slides e dos exem
 professor. Todas as partes do sistema tiveram participação do modelo. O que foi pedido,
 aceito, corrigido e descartado está em `REGISTRO_LLM.md`. A equipe é responsável por
 entender e explicar todo o código.
+
+## Auditoria técnica de 13/11/2026
+
+Histórico: a auditoria inicial encontrou a ausência do responsável transacional. O fechamento nesta cópia implementa o vínculo e sua migração; o parecer vigente depende da validação integrada registrada nos relatórios principais.
+
+Consulte [AUDITORIA_FINAL.md](AUDITORIA_FINAL.md), [EVIDENCIAS_TESTES.md](EVIDENCIAS_TESTES.md), [GUIA_DEFESA.md](GUIA_DEFESA.md), [CHECKLIST_ENTREGA.md](CHECKLIST_ENTREGA.md) e [ALTERACOES_AUDITORIA.md](ALTERACOES_AUDITORIA.md). Evidências individuais estão em `evidencias_auditoria/`. Esses resultados não substituem a revisão e o ensaio dos integrantes.
+
+## Responsáveis pelas transações
+
+Reserva, empréstimo e devolução exigem a seleção explícita de um atendente cadastrado na tela Circulação. A Pessoa do atendente deve ter CPF diferente da Pessoa do estudante; comparar apenas os IDs dos papéis não basta. A fachada valida os participantes no servidor, dentro da unidade de trabalho, antes de gravar os efeitos. O comprovante mostra o responsável escolhido.
+
+Os responsáveis podem ser diferentes em cada etapa: `reserva.atendente_id`, `emprestimo.atendente_id` e `emprestimo.atendente_devolucao_id` são preservados separadamente. Encerrar a reserva mantém seu histórico. Papéis referenciados por movimentações não podem ser excluídos nem ter seu CPF trocado, evitando alterar silenciosamente a identidade histórica. Isso não impede editar dados permitidos da Pessoa ou manter o mesmo CPF.
+
+O `autor` do Command continua sendo o login de quem enviou a solicitação; `atendente_id` identifica o responsável de domínio escolhido. Não há associação automática entre login e papel, nem novo sistema de permissões por perfil. A seleção é uma declaração do operador autenticado, validada contra os cadastros; não comprova por si só quem está fisicamente operando o balcão. Renovar mantém o responsável do empréstimo e não exige um novo atendente.
+
+## Atualização de banco existente
+
+Antes de iniciar esta versão, faça backup e pare a versão anterior. Com o ambiente apontando para a base correta, execute **um único migrador por vez**, sem instâncias concorrentes da aplicação gravando:
+
+```bash
+flask --app app migrar-db
+```
+
+Para uma instalação nova, `flask --app app init-db` cria o schema e aplica a mesma migração aditiva. A migração consulta o catálogo, acrescenta as três colunas de responsáveis e suas chaves estrangeiras quando faltam, e pode ser repetida. Registros legados permanecem com responsável `NULL` quando desconhecido: não se atribui A1 nem outro atendente por suposição. Novas operações são obrigadas pelo domínio a informar um responsável válido; `NULL` existe para compatibilidade histórica, não como opção de novo formulário.
+
+DDL MySQL tem commit implícito: não há promessa de rollback integral de schema. Se ocorrer falha parcial, corrija a causa e execute novamente o migrador, que retoma pelo catálogo. Não execute duas migrações em paralelo. Para recuar operacionalmente, mantenha colunas e dados novos e volte o código anterior; não faça DROP. Enquanto a versão anterior estiver ativa, ela poderá gravar responsáveis ausentes, por isso não misture as versões durante a transição.
+
+## Validação do fechamento
+
+Total final da suíte: **374 aprovados**, zero falhas/erros/skips: 28,22 s na cópia de fechamento e 36,29 s no original após aplicação. O parecer **APTO — PODE ENTREGAR** refere-se ao escopo acadêmico auditado, com Astah excluído. Evidências em `AUDITORIA_FINAL.md`, `EVIDENCIAS_TESTES.md` e `evidencias_fechamento/`. Os resultados da auditoria inicial pertencem ao estado anterior e foram preservados como histórico; a suíte não certifica domínio oral dos integrantes.
+
+Os limites de tamanho dos campos são validados também no backend, com erros de domínio e mensagens para o usuário; os atributos HTML apenas auxiliam o preenchimento. Não há nova regra exclusiva de frontend nem novo RBAC. A cobertura adicional está em `tests/test_atendente_transacoes.py`, `tests/test_persistencia_atendente.py` e `tests/test_migracao_atendente.py`.

@@ -1,0 +1,152 @@
+[
+  {
+    "path": "app.py",
+    "before": "cfc1e09a1f010d9be035f6f5645199788a93f6b3666b1fd4959c8c3505e2df37",
+    "after": "cb9754d60a9c521a0b1d69fc26507bd4b969df4c9d3c9c6a22dd934cddca3c15"
+  },
+  {
+    "path": "dominio/cadastros_template.py",
+    "before": "d89aba1f1f52332293feaf7028f9b14e231cc20e654cc7877bf1f20369b4ad49",
+    "after": "e20be450ac6c9b7d09260f023be407059550be02630b82f2a45e32814a21cfee"
+  },
+  {
+    "path": "dominio/circulacao_command.py",
+    "before": "9bbabba3831dedc04a6164ed4bc6c788f28848b0e1a3c1e5b9f5fccd832a9a81",
+    "after": "705ef44f87f848d5e7dada74aa10c294cbe72df5eebbc586ff40ee72c09fb4e0"
+  },
+  {
+    "path": "dominio/circulacao_facade.py",
+    "before": "ce59e874422600775bcb530492f0e4c36a58fd2babc3c4aa191278baf2994eb4",
+    "after": "2be021650de2ed755ed894ca9aba9ad2bb9941a40df20549d2f5b110d147cdfc"
+  },
+  {
+    "path": "dominio/entidades.py",
+    "before": "c0338b4dac8bbba5c5a806a87e456ffc5ffb85dd2b3728c80873370184e8c75d",
+    "after": "7e49b82d9ffcc382df32f291710ec209d864bf8346e1efd057adb8fd4c08050a"
+  },
+  {
+    "path": "dominio/pontos_acesso.py",
+    "before": "2867a47c963c60d267505ff61b10a339b8a7a32eae76cd0ec301bae87509f4bb",
+    "after": "46867301fa12f453b66db5526cdad6de28f634702177a85d1f09d7c1ff20b5c4"
+  },
+  {
+    "path": "dominio/tratadores.py",
+    "before": "a9f4885adb0b6d0ef670138d5f388f7f2f5c93d2bb181ac9d088da24c30bdc58",
+    "after": "1b11e2ccfe2abef74ee2beb1ba5af7d4d091da2c898e910dbdddd7262e39734f"
+  },
+  {
+    "path": "persistencia/memoria.py",
+    "before": "c4d06abbf396208d26f7b20721254d4ec264c5e9bbe749f711739ebc8d5afe5a",
+    "after": "bfbb43ba0da0f549db8da89f1da2bd5ecdc6c5b140f6bb0e8e670d825d83cd10"
+  },
+  {
+    "path": "persistencia/migracoes.py",
+    "before": null,
+    "after": "42bdd7a3e9cabca5ab8e6f11ea349a7783da96e46f0c2bdc838bb7d68532ae3a"
+  },
+  {
+    "path": "persistencia/mysql.py",
+    "before": "583540ba191a4330e21afc8dad1dd1b0169030d7c84e83f1dfecf6580737c5a5",
+    "after": "8f984a544373e9d61311cfe24939e859b754b028c19b75f6cc66f5c5559f9410"
+  },
+  {
+    "path": "sql/schema.sql",
+    "before": "3d6639be34fbfd6788e4c8c709425d9598c7215fc59d1fece21ada4f9c458ba2",
+    "after": "2a82d8a30802676d4566f61ae88b3c2e18c62982d68ff77137c72806a785be73"
+  },
+  {
+    "path": "templates/circulacao.html",
+    "before": "bd8287ad69652f779396f80cab3787c20cb0357513a8c34d76593b04ca94a98b",
+    "after": "efcc07393b3a6bbb8df9df7dfb1dcdd6a766fe856e9b12deca8f11e69f211056"
+  },
+  {
+    "path": "tests/apoio.py",
+    "before": "44d3393b821fad56be96c1307e8261dab5f43ba35756b4dea96ff63196db50a3",
+    "after": "226de503a46429ae21fa19c529320604065dbaf017edf1a2a6a2d8220c3c7248"
+  },
+  {
+    "path": "tests/conftest.py",
+    "before": "180f175311587cba7845426d1079c2860022dd6eb65eacc2f05f9134962cfb8d",
+    "after": "f947a518b880981474d40993782f688bef0e5efd0f11073debdac0fa364c48c9"
+  },
+  {
+    "path": "tests/test_atendente_transacoes.py",
+    "before": null,
+    "after": "02bcceac753dab4b68ee4298b5d3f06b97aee00de6cc940a862643319a2bf9f4"
+  },
+  {
+    "path": "tests/test_auditoria_boleto.py",
+    "before": "20c38879cf928fe6723345616e75adb46a320280eddc53b080be7360ff82828f",
+    "after": "bcedc0991de79293294e35f925d66ac49764840e6394a655a6dceadc855f46c9"
+  },
+  {
+    "path": "tests/test_auditoria_integridade.py",
+    "before": "c4c9fe7f0d76dbe5af1537cd98882bc4cfe72b54f6720437b7ba0bef71317766",
+    "after": "82b167de87a44e9213f88c04b0ad6126c32873bb64bef4fe8a185aaec4559e10"
+  },
+  {
+    "path": "tests/test_auditoria_observer.py",
+    "before": "82e1c78ddd0559028ce8078a67c8abf4935236ea5bf8d2877a240ecc469667d6",
+    "after": "dacc92cf9ec7468fb5e458e413bd1d4967fdf824018d1329f28206d70a5c930a"
+  },
+  {
+    "path": "tests/test_fluxo_web.py",
+    "before": "5b23cd6d2a10c1cbdabc75f2cd08ab9f5c4bd72e2dc27960d31172fbc11e1710",
+    "after": "5c0bc332796956c39a75a504f10644b185c2b9b5c0e918881c9d1a4f9c63ca8b"
+  },
+  {
+    "path": "tests/test_migracao_atendente.py",
+    "before": null,
+    "after": "c55886c60a031852cdd4a507b7ba799d1faeb303749569ee7fc92afe22a7dd25"
+  },
+  {
+    "path": "tests/test_mysql_integracao.py",
+    "before": "04b5fe1854c0aaffbfe1d22de85bf626f51feae9e51614c1d499b05c107f6888",
+    "after": "7d1c2b3c682da12d9a0f6b31df9d6635fe05c16fb543a6a43219633d642e2124"
+  },
+  {
+    "path": "tests/test_persistencia_atendente.py",
+    "before": null,
+    "after": "db99979c77cfcfb0d84ccfc060609525a01c9e105809596f993c1960ac19fc74"
+  },
+  {
+    "path": "tests/test_r02_strategy.py",
+    "before": "bc09b774b86dfef459148b89a89a83f0cb2240f246f4e9c019f6c5ab316d114a",
+    "after": "c4a0c349e22c17f96961e79654c4be28dee8e8ca908a462f356562413710b9c5"
+  },
+  {
+    "path": "tests/test_r03_adapter.py",
+    "before": "2da16c79640e8ffc266fc6e944582d786b82844fd4de477a4ae676f8a0a09e39",
+    "after": "25ec9e4033cec1ee65d60869fe7fecd955acf17c073f654158d925aed2a28414"
+  },
+  {
+    "path": "tests/test_r04_facade.py",
+    "before": "5a36156cad8f6413604532a2baf4af073d80b3ba1eb6cb4cef4c7a8c07763754",
+    "after": "11d72313e628ff677eae4df272d5962a61f33b7a63fada3d4bbae8d2d290456a"
+  },
+  {
+    "path": "tests/test_r05_observer.py",
+    "before": "197831904daf7b1b8bb017f33c9a8e58025735508ecffc8a13a168d9061ea0ab",
+    "after": "750eb5ecd7cc0b8aed3aa7300b76779348792ae05de97b14032a37b941f6f9e9"
+  },
+  {
+    "path": "tests/test_r06_command.py",
+    "before": "3926fe72f70808a8bff4398b405e00dac6a77cae19f8ee258507111821522a0c",
+    "after": "1eba7173acdee53834801b3cadab4418f70f5c741b93fd3948819f122ae1988a"
+  },
+  {
+    "path": "tests/test_r09_decorator.py",
+    "before": "c16ca1775e33d7b41d4020af1cc73752de3a62cc11aff58c35ecc4d50953acfb",
+    "after": "83d6b3ce16a22788b24c68efa4f10b5b44cba0a94599bbc8d0b829da56e25574"
+  },
+  {
+    "path": "tests/test_validacao_tamanhos.py",
+    "before": null,
+    "after": "d3b5554d1b6d56cc9521a5917f6034b08c2d5665119847f3c0885a47be7dfd7e"
+  },
+  {
+    "path": "web/rotas.py",
+    "before": "d90aebb963f1d45edfd2fc77ad46560439558c36dd755695dd647d17385da152",
+    "after": "79fb21a30b3df897a23650c6f7efa398568ecd423187cbc301ca20d16db4c37a"
+  }
+]

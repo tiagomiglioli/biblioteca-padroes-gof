@@ -1,0 +1,46 @@
+{
+  "database": "biblioteca_gof",
+  "migration_runs": 2,
+  "existing_rows_preserved": true,
+  "counts": {
+    "atendente": 1,
+    "comando_executado": 0,
+    "emprestimo": 0,
+    "estudante": 2,
+    "grupo_acervo": 4,
+    "livro": 5,
+    "multa": 0,
+    "pessoa": 3,
+    "quitacao": 0,
+    "reserva": 0,
+    "usuario": 1
+  },
+  "foreign_keys": [
+    "fk_atendente_pessoa",
+    "fk_devolucao_atendente",
+    "fk_emprestimo_atendente",
+    "fk_emprestimo_estudante",
+    "fk_emprestimo_livro",
+    "fk_estudante_pessoa",
+    "fk_grupo_pai",
+    "fk_livro_grupo",
+    "fk_multa_emprestimo",
+    "fk_multa_estudante",
+    "fk_quitacao_multa",
+    "fk_reserva_atendente",
+    "fk_reserva_estudante",
+    "fk_reserva_livro"
+  ],
+  "ui_sql": {
+    "roles": [
+      [
+        "A1",
+        "A2",
+        "A1"
+      ]
+    ],
+    "fine": "5.00",
+    "paid": true,
+    "settlements": 1
+  }
+}

@@ -40,7 +40,7 @@ def test_r02_valores_monetarios_sao_decimal(politica):
 def devolver_com_atraso(sistema, dias, livro_id="L1"):
     """Empresta hoje e devolve `dias` depois do vencimento (data injetada, sem mexer no relógio)."""
     emprestar(sistema, livro_id=livro_id)
-    sistema.fachada.devolver(livro_id, HOJE + timedelta(days=30 + dias))
+    sistema.fachada.devolver(livro_id, HOJE + timedelta(days=30 + dias), atendente_id="A1")
     return sistema.multa.listar()[-1]
 
 

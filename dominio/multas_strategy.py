@@ -90,7 +90,8 @@ class ServicoMulta:
     def emitir_boleto(self, multa_id):
         """Emite o boleto da multa; se já existe, devolve o mesmo (segunda via)."""
         with self._fabrica.criar_unidade_trabalho() as uow:
-            multa = self._fabrica.criar_financeiro(uow).obter_multa(multa_id)
+            financeiro = self._fabrica.criar_financeiro(uow)
+            multa = financeiro.obter_multa(multa_id, para_atualizar=True)
             if multa is None:
                 raise ErroDominio("Multa não encontrada.")
             if multa.id_boleto:
@@ -98,12 +99,10 @@ class ServicoMulta:
             relacionamento = self._fabrica.criar_relacionamento(uow)
             pessoa = relacionamento.obter_pessoa(relacionamento.obter_estudante(multa.estudante_id).cpf)
 
-        # A chamada à instituição fica fora da transação: não seguramos o banco de dados
-        # enquanto esperamos um sistema externo.
-        boleto = self._cobranca.emitir_boleto(SolicitacaoCobranca(f"multa-{multa.id}", pessoa.cpf, multa.valor))
-
-        with self._fabrica.criar_unidade_trabalho() as uow:
-            self._fabrica.criar_financeiro(uow).registrar_boleto(multa.id, boleto.banco, boleto.id_boleto)
+            # A trava permanece até gravar: duas segundas vias não emitem duas cobranças.
+            # shortcut: banco simulado dentro da transação; API real exige idempotência por referência.
+            boleto = self._cobranca.emitir_boleto(SolicitacaoCobranca(f"multa-{multa.id}", pessoa.cpf, multa.valor))
+            financeiro.registrar_boleto(multa.id, boleto.banco, boleto.id_boleto)
         multa.banco, multa.id_boleto = boleto.banco, boleto.id_boleto
         self._email.enviar(pessoa.email, "Boleto de multa da biblioteca",
                            f"Multa de R$ {multa.valor} — boleto {boleto.id_boleto} ({boleto.banco}).")

@@ -93,6 +93,8 @@ class Reserva:
     livro_id: str
     estudante_id: str
     data: date
+    atendente_id: str | None = None
+    ativa: bool = True
 
 
 @dataclass
@@ -102,6 +104,8 @@ class Emprestimo:
     estudante_id: str
     data_emprestimo: date
     data_devolucao: date | None = None
+    atendente_id: str | None = None
+    atendente_devolucao_id: str | None = None
 
 
 @dataclass
@@ -127,6 +131,7 @@ class Comprovante:
     estado: str
     vencimento: date | None
     mensagem: str
+    atendente_id: str | None = None
 
     def para_texto(self):
         """Texto guardado junto ao id da solicitação, para repetir a mesma resposta (R06)."""

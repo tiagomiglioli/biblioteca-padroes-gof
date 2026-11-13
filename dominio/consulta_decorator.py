@@ -26,6 +26,9 @@ class ConsultaAcervo(ABC):
     def consultar(self, livro_id):
         """Devolve MetadadosLivro, ou None se o livro não existe."""
 
+    def invalidar(self, livro_id):
+        """Descarta metadados antigos, quando a implementação os guarda."""
+
 
 class ConsultaBase(ConsultaAcervo):
     """GoF Decorator — Essencia: a consulta original, direto no repositório."""
@@ -48,15 +51,25 @@ class DecoradorConsulta(ConsultaAcervo):
     def consultar(self, livro_id):
         return self._componente.consultar(livro_id)
 
+    def invalidar(self, livro_id):
+        self._componente.invalidar(livro_id)
+
 
 class ConsultaComCache(DecoradorConsulta):
     """GoF Decorator — DecoradorConcreto: lembra dos metadados já consultados."""
 
     def __init__(self, componente, cache=None):
         super().__init__(componente)
-        # shortcut: cache sem expiração nem invalidação; trocar por um com prazo
-        # se os títulos passarem a ser editados com frequência.
+        # shortcut: invalidação local; usar cache compartilhado ao executar múltiplos processos.
         self._cache = {} if cache is None else cache
+
+    def invalidar(self, livro_id):
+        try:
+            self._cache.pop(livro_id, None)
+        except Exception:
+            registro.warning("Não foi possível invalidar o cache; descartando a cópia local.")
+            self._cache = {}
+        super().invalidar(livro_id)
 
     def consultar(self, livro_id):
         # O cache é um acessório: se ele falhar, a consulta original responde.

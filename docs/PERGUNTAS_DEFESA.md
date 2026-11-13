@@ -113,3 +113,33 @@ enunciado lista em "Na arguição, saiba explicar".
 - **Como a senha é guardada?** Só o hash (`generate_password_hash` em `TratadorDeAcesso.criar_usuario`).
 - **Como evitam SQL injection?** Todo SQL usa `%s` com parâmetros (`_RepositorioMySQL._executar`).
 - **O que protege os formulários?** Token CSRF em todo POST (`CSRFProtect` em `app.py`) e login exigido no servidor (`exigir_login` em `web/rotas.py`).
+
+## Responsáveis pelas transações
+
+Reserva, empréstimo e devolução exigem a seleção explícita de um atendente cadastrado na tela Circulação. A Pessoa do atendente deve ter CPF diferente da Pessoa do estudante; comparar apenas os IDs dos papéis não basta. A fachada valida os participantes no servidor, dentro da unidade de trabalho, antes de gravar os efeitos. O comprovante mostra o responsável escolhido.
+
+Os responsáveis podem ser diferentes em cada etapa: `reserva.atendente_id`, `emprestimo.atendente_id` e `emprestimo.atendente_devolucao_id` são preservados separadamente. Encerrar a reserva mantém seu histórico. Papéis referenciados por movimentações não podem ser excluídos nem ter seu CPF trocado, evitando alterar silenciosamente a identidade histórica. Isso não impede editar dados permitidos da Pessoa ou manter o mesmo CPF.
+
+O `autor` do Command continua sendo o login de quem enviou a solicitação; `atendente_id` identifica o responsável de domínio escolhido. Não há associação automática entre login e papel, nem novo sistema de permissões por perfil. A seleção é uma declaração do operador autenticado, validada contra os cadastros; não comprova por si só quem está fisicamente operando o balcão. Renovar mantém o responsável do empréstimo e não exige um novo atendente.
+
+## Atualização de banco existente
+
+Antes de iniciar esta versão, faça backup e pare a versão anterior. Com o ambiente apontando para a base correta, execute **um único migrador por vez**, sem instâncias concorrentes da aplicação gravando:
+
+```bash
+flask --app app migrar-db
+```
+
+Para uma instalação nova, `flask --app app init-db` cria o schema e aplica a mesma migração aditiva. A migração consulta o catálogo, acrescenta as três colunas de responsáveis e suas chaves estrangeiras quando faltam, e pode ser repetida. Registros legados permanecem com responsável `NULL` quando desconhecido: não se atribui A1 nem outro atendente por suposição. Novas operações são obrigadas pelo domínio a informar um responsável válido; `NULL` existe para compatibilidade histórica, não como opção de novo formulário.
+
+DDL MySQL tem commit implícito: não há promessa de rollback integral de schema. Se ocorrer falha parcial, corrija a causa e execute novamente o migrador, que retoma pelo catálogo. Não execute duas migrações em paralelo. Para recuar operacionalmente, mantenha colunas e dados novos e volte o código anterior; não faça DROP. Enquanto a versão anterior estiver ativa, ela poderá gravar responsáveis ausentes, por isso não misture as versões durante a transição.
+
+## Perguntas de migração e integridade histórica
+
+- **Por que permitir NULL no schema se atendente é obrigatório?** Para preservar histórico anterior cujo responsável não é conhecido. O domínio rejeita ausência em novas reservas, empréstimos e devoluções.
+- **É possível recuperar uma migração interrompida?** O migrador consulta o catálogo e retoma os elementos ausentes. MySQL confirma DDL implicitamente; isso é retomada, não rollback transacional de schema.
+- **Podemos executar dois migradores ou manter código antigo gravando?** Não no procedimento recomendado. Parar a versão antiga, fazer backup, migrar serialmente e iniciar a nova; código antigo poderia continuar gravando NULL.
+- **Como preservar a identidade histórica?** Não excluir papéis referenciados nem trocar seu CPF após uso. Os responsáveis das três etapas permanecem distintos e os comprovantes antigos continuam legíveis.
+- **O frontend é a única barreira para tamanhos e participantes inválidos?** Não. O backend valida os limites dos campos e a fachada valida os participantes; HTML só orienta o preenchimento.
+
+Total final da suíte: **374 aprovados**, zero falhas/erros/skips: 28,22 s na cópia de fechamento e 36,29 s no original após aplicação. O parecer **APTO — PODE ENTREGAR** refere-se ao escopo acadêmico auditado, com Astah excluído. Evidências em `AUDITORIA_FINAL.md`, `EVIDENCIAS_TESTES.md` e `evidencias_fechamento/`. Os resultados da auditoria inicial pertencem ao estado anterior e foram preservados como histórico; a suíte não certifica domínio oral dos integrantes.

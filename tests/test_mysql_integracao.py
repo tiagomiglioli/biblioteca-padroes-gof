@@ -28,7 +28,7 @@ def test_mysql_dados_continuam_la_depois_de_fechar_e_reabrir(fabrica_mysql, mysq
     sistema = sistema_pronto(fabrica_mysql)
     emprestar(sistema)
     sistema.fachada.renovar("E1", "L1")
-    sistema.fachada.devolver("L1", HOJE + timedelta(days=65))
+    sistema.fachada.devolver("L1", HOJE + timedelta(days=65), atendente_id="A1")
     del sistema, fabrica_mysql                         # nada do processo "antigo" sobra
 
     nova_fabrica = FabricaMySQL(mysql_preparado)       # como se a aplicação tivesse reiniciado
@@ -74,7 +74,7 @@ def test_mysql_restricao_do_banco_barra_comando_e_quitacao_repetidos(fabrica_mys
     emprestar(sistema)
     comando = ComandoRenovacao(sistema.fachada, "E1", "L1", autor="ana")
     sistema.executor.executar(comando)
-    sistema.fachada.devolver("L1", HOJE + timedelta(days=70))
+    sistema.fachada.devolver("L1", HOJE + timedelta(days=70), atendente_id="A1")
     multa = sistema.multa.listar()[0]
     sistema.multa.simular_pagamento(multa.id)
 

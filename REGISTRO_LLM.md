@@ -53,7 +53,7 @@ A equipe deve completar a coluna "Revisão da equipe" depois de ler e executar c
 
 - Prazo inicial do empréstimo de 30 dias (o Trabalho 02 só fixa os 30 dias da renovação).
 - Guarda `numRenovacoes < 2` em vez do `<= 2` citado como exemplo na tabela da seção 11 do Trabalho 02.
-- "Atualizar" estudante/atendente troca a pessoa vinculada (são os únicos dados do papel).
+- Suposição original: "Atualizar" estudante/atendente trocava a pessoa vinculada. O fechamento abaixo restringe essa troca quando o papel já tem movimentação.
 
 ## O que o modelo NÃO fez
 
@@ -78,3 +78,29 @@ A equipe deve completar a coluna "Revisão da equipe" depois de ler e executar c
 | Singleton | | | |
 | Web e autenticação | | | |
 | Persistência MySQL | | | |
+
+## Histórico — auditoria inicial assistida de 13/11/2026 — Codex/OpenAI
+
+Solicitação: auditoria final rigorosa dos dez padrões GoF e Singleton, execução real de testes/MySQL/interface, correções conservadoras e relatórios de entrega/defesa. O usuário posteriormente excluiu o Astah da avaliação.
+
+Ferramenta: Codex desktop/OpenAI, com subagentes de domínio, persistência e documentação. A identificação exata do modelo desta execução não foi confirmada; este registro não modifica a identificação histórica declarada anteriormente pela equipe. Skills usadas: Superpowers (investigação, testes e verificação), Graphify, Ponytail e leitura de PDF. RTK nas execuções shell; CUA no navegador real.
+
+Aceito/aplicado: proteção da emissão concorrente de boletos; deduplicação local do Observer; integridade de exclusões em memória; proteção da base de testes e propagação de erros SQL; invalidação local do cache após commit. Foram acrescentados 31 testes aos 274 existentes. Resultado daquela auditoria inicial: 305 aprovados, zero falhas e zero skips, MySQL real. Evidências e limites em EVIDENCIAS_TESTES.md.
+
+Não aplicado naquela auditoria inicial: reestruturação para vínculo transacional do atendente, pois exige decisão e alteração coordenada de domínio/schema/tela/testes. Não foi presumida dispensa do requisito do Trabalho 02. Não foram acrescentadas integrações bancárias reais, SMTP, fila durável ou dependências. Não houve commit, push ou publicação.
+
+Decisão histórica da auditoria inicial: NÃO APTO no escopo funcional, independentemente de Astah. Naquele momento, a recomendação era conferir o diff, resolver o vínculo do atendente e realizar a defesa/ensaio pessoalmente; geração assistida não comprova domínio oral. O fechamento autorizado está registrado a seguir.
+
+## Fechamento autorizado — vínculo transacional do atendente
+
+Pedido posterior da equipe: resolver o requisito de atendente identificado na auditoria inicial, em cópia isolada, preservando os onze padrões e os dados existentes. A ausência apontada anteriormente é contexto histórico, não descrição do código desta etapa.
+
+Decisão aceita: seleção explícita de atendente cadastrado em reserva, empréstimo e devolução; validação de Pessoa distinta do estudante na fachada, dentro da transação; três responsáveis persistidos separadamente; reserva encerrada mantida como histórico; exclusão e troca de CPF de papel já usado recusadas. Autor do Command continua sendo o login do operador e não substitui o responsável selecionado.
+
+Migração aceita: colunas e FKs aditivas, com NULL para legado desconhecido, catálogo para repetição/retomada e nenhum preenchimento inventado. `migrar-db` prepara base existente; `init-db` também aplica a migração. Parar a versão anterior, executar um migrador por vez e só então iniciar a nova. DDL MySQL pode confirmar parcialmente; recuar código preserva as colunas, sem DROP.
+
+Também foram tratados limites de campos no servidor e mensagens de erro da interface. Descartado: redesenhar autenticação para vincular toda conta a Atendente ou criar RBAC novo. Permanecem os limites documentados de replay durável do Observer, configuração entre processos e efeitos de APIs bancárias reais.
+
+Total final da suíte: **374 aprovados**, zero falhas/erros/skips: 28,22 s na cópia de fechamento e 36,29 s no original após aplicação. O parecer **APTO — PODE ENTREGAR** refere-se ao escopo acadêmico auditado, com Astah excluído. Evidências em `AUDITORIA_FINAL.md`, `EVIDENCIAS_TESTES.md` e `evidencias_fechamento/`. Os resultados da auditoria inicial pertencem ao estado anterior e foram preservados como histórico; a suíte não certifica domínio oral dos integrantes.
+
+A migração da base principal foi executada duas vezes, comprovando idempotência. Os dados anteriores das 11 tabelas permaneceram iguais; o catálogo passou a 14 FKs, incluindo as três dos responsáveis. Evidência: `evidencias_fechamento/migracao-e-ui.json`. O auditor principal aplicou 30 arquivos no original, executou novamente a suíte (374 aprovados em 36,29 s, zero falhas/erros/skips, exit 0), conferiu `git diff --check` sem problemas e reiniciou o servidor original em `127.0.0.1:5057`, com login funcional.

@@ -76,7 +76,7 @@ def test_r03_banco_da_instalacao_e_escolhido_pela_configuracao():
 
 def multa_atrasada(sistema):
     emprestar(sistema)
-    sistema.fachada.devolver("L1", HOJE + timedelta(days=37))
+    sistema.fachada.devolver("L1", HOJE + timedelta(days=37), atendente_id="A1")
     return sistema.multa.listar()[-1]
 
 

@@ -37,22 +37,35 @@ class CirculacaoFacade:
             raise ErroDominio(f"Livro {livro_id!r} não está cadastrado no acervo.")
         return livro
 
-    def _comprovante(self, operacao, livro, estudante_id, mensagem):
+    def _comprovante(self, operacao, livro, estudante_id, mensagem, atendente_id=None):
         vencimento = livro.vencimento if livro.nome_estado in ("EMPRESTADO", "RENOVADO") else None
-        return Comprovante(operacao, livro.id, estudante_id, livro.nome_estado, vencimento, mensagem)
+        return Comprovante(operacao, livro.id, estudante_id, livro.nome_estado, vencimento, mensagem, atendente_id)
 
-    def reservar(self, estudante_id, livro_id, uow=None):
+    def _validar_participantes(self, uow, estudante_id, atendente_id):
+        """Toda transação envolve papéis cadastrados de pessoas diferentes."""
+        if not atendente_id:
+            raise ErroDominio("Informe um atendente cadastrado para a transação.")
+        relacionamento = self._fabrica.criar_relacionamento(uow)
+        estudante = relacionamento.obter_estudante(estudante_id, para_atualizar=True)
+        if estudante is None:
+            raise ErroDominio(f"Estudante {estudante_id!r} não está cadastrado.")
+        atendente = relacionamento.obter_atendente(atendente_id, para_atualizar=True)
+        if atendente is None:
+            raise ErroDominio("Atendente não está cadastrado.")
+        if estudante.cpf == atendente.cpf:
+            raise ErroDominio("Estudante e atendente devem ser pessoas diferentes.")
+
+    def reservar(self, estudante_id, livro_id, uow=None, atendente_id=None):
         """Regra 5: reserva livro LIVRE para estudante cadastrado. Lança ErroDominio se recusada."""
         with self._transacao(uow) as uow:
             acervo = self._fabrica.criar_acervo(uow)
             livro = self._livro(acervo, livro_id)
-            if self._fabrica.criar_relacionamento(uow).obter_estudante(estudante_id) is None:
-                raise ErroDominio(f"Estudante {estudante_id!r} não está cadastrado.")
+            self._validar_participantes(uow, estudante_id, atendente_id)
             # A decisão usa o estado ATUAL lido do repositório, nunca um cache de consulta (R09).
             livro.reservar()
-            self._fabrica.criar_movimentacao(uow).inserir_reserva(livro_id, estudante_id, self._relogio())
+            self._fabrica.criar_movimentacao(uow).inserir_reserva(livro_id, estudante_id, self._relogio(), atendente_id)
             acervo.atualizar(livro)
-            return self._comprovante("reserva", livro, estudante_id, "Reserva registrada.")
+            return self._comprovante("reserva", livro, estudante_id, "Reserva registrada.", atendente_id)
 
     def consultar_reserva(self, estudante_id, livro_id):
         """Regra 6: comprovante da reserva ativa; ErroDominio se não houver."""
@@ -62,9 +75,9 @@ class CirculacaoFacade:
             if reserva is None:
                 raise ErroDominio("Não há reserva ativa deste livro para este estudante.")
             return self._comprovante("consulta de reserva", livro, estudante_id,
-                                     f"Reserva nº {reserva.id} ativa desde {reserva.data:%d/%m/%Y}.")
+                                     f"Reserva nº {reserva.id} ativa desde {reserva.data:%d/%m/%Y}.", reserva.atendente_id)
 
-    def emprestar(self, estudante_id, livro_id):
+    def emprestar(self, estudante_id, livro_id, atendente_id=None):
         """Regra 7: efetiva o empréstimo de um livro reservado pelo MESMO estudante."""
         # Os quatro passos abaixo usam a mesma transação. Se qualquer um falhar,
         # o rollback devolve a reserva e o livro continua RESERVADO.
@@ -75,11 +88,12 @@ class CirculacaoFacade:
             reserva = movimentacao.consultar_reserva(livro_id, estudante_id)       # 1. valida a reserva
             if reserva is None:
                 raise ErroDominio("Não há reserva ativa deste livro para este estudante.")
+            self._validar_participantes(uow, estudante_id, atendente_id)
             movimentacao.remover_reserva(reserva.id)                               # 2. remove a reserva ativa
             livro.emprestar(self._relogio())
-            movimentacao.inserir_emprestimo(livro_id, estudante_id, self._relogio())   # 3. cria o empréstimo
+            movimentacao.inserir_emprestimo(livro_id, estudante_id, self._relogio(), atendente_id)   # 3. cria o empréstimo
             acervo.atualizar(livro)                                                # 4. atualiza o Livro
-            return self._comprovante("emprestimo", livro, estudante_id, "Empréstimo efetivado.")
+            return self._comprovante("emprestimo", livro, estudante_id, "Empréstimo efetivado.", atendente_id)
 
     def renovar(self, estudante_id, livro_id, uow=None):
         """Regra 8: +30 dias, no máximo duas vezes (a guarda está no State)."""
@@ -94,7 +108,7 @@ class CirculacaoFacade:
             return self._comprovante("renovacao", livro, estudante_id,
                                      f"Renovação {livro.num_renovacoes} de 2 registrada.")
 
-    def devolver(self, livro_id, data_devolucao=None):
+    def devolver(self, livro_id, data_devolucao=None, atendente_id=None):
         """Regra 9: registra a devolução; depois do commit, avisa os ouvintes (Observer)."""
         data_devolucao = data_devolucao or self._relogio()
         with self._transacao() as uow:
@@ -103,19 +117,20 @@ class CirculacaoFacade:
             relacionamento = self._fabrica.criar_relacionamento(uow)
             livro = self._livro(acervo, livro_id)
             vencimento = livro.vencimento
-            livro.devolver()
             emprestimo = movimentacao.consultar_emprestimo(livro_id)
             if emprestimo is None:
                 raise ErroDominio("Não há empréstimo em aberto para este livro.")
             if data_devolucao < emprestimo.data_emprestimo:
                 raise ErroDominio("A data de devolução não pode ser anterior ao empréstimo.")
-            movimentacao.registrar_devolucao(emprestimo.id, data_devolucao)
+            self._validar_participantes(uow, emprestimo.estudante_id, atendente_id)
+            livro.devolver()
+            movimentacao.registrar_devolucao(emprestimo.id, data_devolucao, atendente_id)
             acervo.atualizar(livro)
             pessoa = relacionamento.obter_pessoa(relacionamento.obter_estudante(emprestimo.estudante_id).cpf)
             evento = EventoDevolucao(emprestimo.id, livro_id, emprestimo.estudante_id, pessoa.cpf,
                                      pessoa.email, vencimento, data_devolucao)
             comprovante = self._comprovante("devolucao", livro, emprestimo.estudante_id,
-                                            f"Devolução registrada com {evento.dias_atraso} dia(s) de atraso.")
+                                            f"Devolução registrada com {evento.dias_atraso} dia(s) de atraso.", atendente_id)
         # Só aqui, com a devolução já confirmada (commit), os ouvintes são avisados.
         # Se o commit falhasse, ninguém receberia notícia de algo que não aconteceu.
         self._publicador.publicar(evento)

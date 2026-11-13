@@ -15,7 +15,7 @@ def test_r05_devolucao_atrasada_alimenta_inspecao_multa_e_indicadores(fabrica):
     sistema = sistema_pronto(fabrica)
     emprestar(sistema)
 
-    sistema.fachada.devolver("L1", VENCIMENTO + timedelta(days=4))
+    sistema.fachada.devolver("L1", VENCIMENTO + timedelta(days=4), atendente_id="A1")
 
     assert sistema.inspecao.pendentes == ["L1"]
     assert [multa.valor for multa in sistema.multa.listar()] == [Decimal("4.00")]
@@ -27,7 +27,7 @@ def test_r05_devolucao_no_prazo_nao_gera_multa(fabrica):
     sistema = sistema_pronto(fabrica)
     emprestar(sistema)
 
-    sistema.fachada.devolver("L1", VENCIMENTO)
+    sistema.fachada.devolver("L1", VENCIMENTO, atendente_id="A1")
 
     assert sistema.multa.listar() == ()
     assert (sistema.indicadores.devolucoes, sistema.indicadores.atrasadas) == (1, 0)
@@ -37,7 +37,7 @@ def test_r05_devolucao_no_prazo_nao_gera_multa(fabrica):
 def test_r05_livro_permanece_devolvido_ate_a_decisao_da_inspecao(fabrica):
     sistema = sistema_pronto(fabrica)
     emprestar(sistema)
-    sistema.fachada.devolver("L1", VENCIMENTO)
+    sistema.fachada.devolver("L1", VENCIMENTO, atendente_id="A1")
 
     assert livro_no_banco(fabrica).nome_estado == "DEVOLVIDO"     # avisar a inspeção não muda o estado
 
@@ -53,7 +53,7 @@ def test_r05_falha_do_email_nao_afeta_os_demais_nem_desfaz_a_devolucao(fabrica):
         raise ConnectionError("servidor de e-mail fora do ar")
     sistema.email.enviar = servidor_fora_do_ar
 
-    comprovante = sistema.fachada.devolver("L1", VENCIMENTO + timedelta(days=4))
+    comprovante = sistema.fachada.devolver("L1", VENCIMENTO + timedelta(days=4), atendente_id="A1")
 
     assert comprovante.estado == "DEVOLVIDO"
     assert livro_no_banco(fabrica).nome_estado == "DEVOLVIDO"
@@ -74,7 +74,7 @@ def test_r05_publicacao_ocorre_depois_da_confirmacao_da_devolucao(fabrica):
             visto["estado"] = livro_no_banco(fabrica).nome_estado
 
     sistema.publicador.registrar(OuvinteQueConfereOBanco())     # novo ouvinte, tratador intocado
-    sistema.devolucao.registrar_devolucao("L1", VENCIMENTO)
+    sistema.devolucao.registrar_devolucao("L1", VENCIMENTO, atendente_id="A1")
 
     assert visto == {"estado": "DEVOLVIDO"}
 
@@ -89,7 +89,7 @@ def test_r05_evento_leva_os_dados_necessarios_e_e_imutavel(fabrica):
             recebidos.append(evento)
 
     sistema.publicador.registrar(Coletor())
-    sistema.fachada.devolver("L1", VENCIMENTO + timedelta(days=2))
+    sistema.fachada.devolver("L1", VENCIMENTO + timedelta(days=2), atendente_id="A1")
 
     evento = recebidos[0]
     assert isinstance(evento, EventoDevolucao)
@@ -104,7 +104,7 @@ def test_r05_evento_leva_os_dados_necessarios_e_e_imutavel(fabrica):
 def test_r05_email_de_devolucao_vai_para_a_caixa_de_saida_simulada(fabrica):
     sistema = sistema_pronto(fabrica)
     emprestar(sistema)
-    sistema.fachada.devolver("L1", VENCIMENTO)
+    sistema.fachada.devolver("L1", VENCIMENTO, atendente_id="A1")
     assert sistema.email.caixa_de_saida[-1][0] == ANA["email"]
 
 
@@ -118,7 +118,7 @@ def test_r05_mesmo_evento_entregue_duas_vezes_gera_uma_unica_multa(fabrica):
             recebidos.append(evento)
 
     sistema.publicador.registrar(Coletor())
-    sistema.fachada.devolver("L1", VENCIMENTO + timedelta(days=4))
+    sistema.fachada.devolver("L1", VENCIMENTO + timedelta(days=4), atendente_id="A1")
 
     repetida = sistema.servico_multa.emitir_multa(recebidos[0])
 

@@ -1,0 +1,522 @@
+--- a/dominio/consulta_decorator.py
++++ b/dominio/consulta_decorator.py
+@@ -26,6 +26,9 @@
+     def consultar(self, livro_id):
+         """Devolve MetadadosLivro, ou None se o livro não existe."""
+ 
++    def invalidar(self, livro_id):
++        """Descarta metadados antigos, quando a implementação os guarda."""
++
+ 
+ class ConsultaBase(ConsultaAcervo):
+     """GoF Decorator — Essencia: a consulta original, direto no repositório."""
+@@ -48,15 +51,25 @@
+     def consultar(self, livro_id):
+         return self._componente.consultar(livro_id)
+ 
++    def invalidar(self, livro_id):
++        self._componente.invalidar(livro_id)
++
+ 
+ class ConsultaComCache(DecoradorConsulta):
+     """GoF Decorator — DecoradorConcreto: lembra dos metadados já consultados."""
+ 
+     def __init__(self, componente, cache=None):
+         super().__init__(componente)
+-        # shortcut: cache sem expiração nem invalidação; trocar por um com prazo
+-        # se os títulos passarem a ser editados com frequência.
++        # shortcut: invalidação local; usar cache compartilhado ao executar múltiplos processos.
+         self._cache = {} if cache is None else cache
++
++    def invalidar(self, livro_id):
++        try:
++            self._cache.pop(livro_id, None)
++        except Exception:
++            registro.warning("Não foi possível invalidar o cache; descartando a cópia local.")
++            self._cache = {}
++        super().invalidar(livro_id)
+ 
+     def consultar(self, livro_id):
+         # O cache é um acessório: se ele falhar, a consulta original responde.
+--- a/dominio/devolucao_observer.py
++++ b/dominio/devolucao_observer.py
+@@ -3,6 +3,7 @@
+ from abc import ABC, abstractmethod
+ from dataclasses import dataclass
+ from datetime import date
++from threading import RLock
+ 
+ registro = logging.getLogger("biblioteca")
+ 
+@@ -40,21 +41,29 @@
+     def __init__(self):
+         self._ouvintes = []
+         self.falhas = []
++        self._entregues = set()
++        self._trava = RLock()
+ 
+     def registrar(self, ouvinte):
+         self._ouvintes.append(ouvinte)
+ 
+     def publicar(self, evento):
+         """Chamado pela fachada DEPOIS do commit da devolução."""
+-        for ouvinte in self._ouvintes:
+-            # Cada ouvinte é isolado: se um falhar (ex.: e-mail fora do ar), os outros
+-            # ainda são avisados e a devolução, já confirmada, não é desfeita.
+-            try:
+-                ouvinte.notificar(evento)
+-            except Exception as erro:
+-                self.falhas.append((type(ouvinte).__name__, str(erro)))
+-                registro.exception("Ouvinte %s falhou na devolução do livro %s",
+-                                   type(ouvinte).__name__, evento.livro_id)
++        # shortcut: deduplicação local; usar registro persistido se houver fila entre processos.
++        with self._trava:
++            for indice, ouvinte in enumerate(self._ouvintes):
++                chave = (evento.emprestimo_id, indice)
++                if chave in self._entregues:
++                    continue
++                # Cada ouvinte é isolado: se um falhar (ex.: e-mail fora do ar), os outros
++                # ainda são avisados e a devolução, já confirmada, não é desfeita.
++                try:
++                    ouvinte.notificar(evento)
++                    self._entregues.add(chave)
++                except Exception as erro:
++                    self.falhas.append((type(ouvinte).__name__, str(erro)))
++                    registro.exception("Ouvinte %s falhou na devolução do livro %s",
++                                       type(ouvinte).__name__, evento.livro_id)
+ 
+ 
+ class ServicoEmail:
+--- a/dominio/multas_strategy.py
++++ b/dominio/multas_strategy.py
+@@ -90,7 +90,8 @@
+     def emitir_boleto(self, multa_id):
+         """Emite o boleto da multa; se já existe, devolve o mesmo (segunda via)."""
+         with self._fabrica.criar_unidade_trabalho() as uow:
+-            multa = self._fabrica.criar_financeiro(uow).obter_multa(multa_id)
++            financeiro = self._fabrica.criar_financeiro(uow)
++            multa = financeiro.obter_multa(multa_id, para_atualizar=True)
+             if multa is None:
+                 raise ErroDominio("Multa não encontrada.")
+             if multa.id_boleto:
+@@ -98,12 +99,10 @@
+             relacionamento = self._fabrica.criar_relacionamento(uow)
+             pessoa = relacionamento.obter_pessoa(relacionamento.obter_estudante(multa.estudante_id).cpf)
+ 
+-        # A chamada à instituição fica fora da transação: não seguramos o banco de dados
+-        # enquanto esperamos um sistema externo.
+-        boleto = self._cobranca.emitir_boleto(SolicitacaoCobranca(f"multa-{multa.id}", pessoa.cpf, multa.valor))
+-
+-        with self._fabrica.criar_unidade_trabalho() as uow:
+-            self._fabrica.criar_financeiro(uow).registrar_boleto(multa.id, boleto.banco, boleto.id_boleto)
++            # A trava permanece até gravar: duas segundas vias não emitem duas cobranças.
++            # shortcut: banco simulado dentro da transação; API real exige idempotência por referência.
++            boleto = self._cobranca.emitir_boleto(SolicitacaoCobranca(f"multa-{multa.id}", pessoa.cpf, multa.valor))
++            financeiro.registrar_boleto(multa.id, boleto.banco, boleto.id_boleto)
+         multa.banco, multa.id_boleto = boleto.banco, boleto.id_boleto
+         self._email.enviar(pessoa.email, "Boleto de multa da biblioteca",
+                            f"Multa de R$ {multa.valor} — boleto {boleto.id_boleto} ({boleto.banco}).")
+--- a/dominio/pontos_acesso.py
++++ b/dominio/pontos_acesso.py
+@@ -139,7 +139,7 @@
+     def inserir_multa(self, emprestimo_id, estudante_id, dias_atraso, valor, politica): ...
+ 
+     @abstractmethod
+-    def obter_multa(self, multa_id): ...
++    def obter_multa(self, multa_id, para_atualizar=False): ...
+ 
+     @abstractmethod
+     def obter_multa_do_emprestimo(self, emprestimo_id): ...
+--- a/dominio/tratadores.py
++++ b/dominio/tratadores.py
+@@ -178,7 +178,10 @@
+             livro.titulo = campo(dados, "titulo")
+             acervo.atualizar(livro)
+             return True
+-        return self._no_acervo(operacao)
++        atualizado = self._no_acervo(operacao)
++        if atualizado:
++            self._consulta.invalidar(campo(dados, "id"))
++        return atualizado
+ 
+     def excluir(self, livro_id):
+         """Exclui o livro; o State só aceita excluir livro LIVRE (T11)."""
+@@ -189,7 +192,10 @@
+             livro.excluir()
+             acervo.excluir(livro_id)
+             return True
+-        return self._no_acervo(operacao)
++        excluido = self._no_acervo(operacao)
++        if excluido:
++            self._consulta.invalidar(livro_id)
++        return excluido
+ 
+     def listar(self):
+         return self._no_acervo(lambda acervo: acervo.listar())
+--- a/persistencia/memoria.py
++++ b/persistencia/memoria.py
+@@ -7,6 +7,7 @@
+ import threading
+ 
+ from dominio.entidades import Emprestimo, Multa, Reserva
++from dominio.erros import ErroDominio
+ from dominio.pontos_acesso import Acervo, Financeiro, Movimentacao, Relacionamento
+ from persistencia.unidade_trabalho import UnidadeTrabalhoMemoria
+ 
+@@ -61,6 +62,9 @@
+         self._guardar("livros", livro.id, livro)
+ 
+     def excluir(self, livro_id):
++        if any(item.livro_id == livro_id for tabela in ("reservas", "emprestimos")
++               for item in self._tabela(tabela).values()):
++            raise ErroDominio("Operação recusada: o registro tem vínculos com outros cadastros.")
+         self._tabela("livros").pop(livro_id, None)
+         self._tabela("itens").pop(livro_id, None)
+ 
+@@ -139,6 +143,9 @@
+         self._guardar("pessoas", pessoa.cpf, pessoa)
+ 
+     def excluir_pessoa(self, cpf):
++        if any(item.cpf == cpf for tabela in ("estudantes", "atendentes")
++               for item in self._tabela(tabela).values()):
++            raise ErroDominio("Operação recusada: o registro tem vínculos com outros cadastros.")
+         self._tabela("pessoas").pop(cpf, None)
+ 
+     def listar_pessoas(self):
+@@ -154,6 +161,9 @@
+         self._guardar("estudantes", estudante.id, estudante)
+ 
+     def excluir_estudante(self, estudante_id):
++        if any(item.estudante_id == estudante_id for tabela in ("reservas", "emprestimos", "multas")
++               for item in self._tabela(tabela).values()):
++            raise ErroDominio("Operação recusada: o registro tem vínculos com outros cadastros.")
+         self._tabela("estudantes").pop(estudante_id, None)
+ 
+     def listar_estudantes(self):
+@@ -189,7 +199,7 @@
+         self._guardar("multas", multa.id, multa)
+         return multa
+ 
+-    def obter_multa(self, multa_id):
++    def obter_multa(self, multa_id, para_atualizar=False):
+         return self._ler("multas", multa_id)
+ 
+     def _primeira(self, condicao):
+--- a/persistencia/mysql.py
++++ b/persistencia/mysql.py
+@@ -252,8 +252,9 @@
+     def _buscar(self, condicao, parametros):
+         return _multa(self._linha(f"SELECT {COLUNAS_MULTA} FROM multa WHERE {condicao}", parametros))
+ 
+-    def obter_multa(self, multa_id):
+-        return self._buscar("id = %s", (multa_id,))
++    def obter_multa(self, multa_id, para_atualizar=False):
++        bloqueio = " FOR UPDATE" if para_atualizar else ""
++        return self._buscar("id = %s" + bloqueio, (multa_id,))
+ 
+     def obter_multa_do_emprestimo(self, emprestimo_id):
+         return self._buscar("emprestimo_id = %s", (emprestimo_id,))
+--- a/tests/conftest.py
++++ b/tests/conftest.py
+@@ -22,12 +22,15 @@
+ 
+ def parametros_mysql_teste():
+     """Banco SEPARADO do de demonstração: os testes apagam todas as tabelas dele."""
++    banco = os.environ.get("MYSQL_TEST_DATABASE", "biblioteca_gof_teste")
++    if banco.casefold() == os.environ.get("MYSQL_DATABASE", "biblioteca_gof").casefold():
++        raise ValueError("MYSQL_TEST_DATABASE deve ser diferente de MYSQL_DATABASE.")
+     return {
+         "host": os.environ.get("MYSQL_HOST", "127.0.0.1"),
+         "port": int(os.environ.get("MYSQL_PORT", "3306")),
+         "user": os.environ.get("MYSQL_USER", ""),
+         "password": os.environ.get("MYSQL_PASSWORD", ""),
+-        "database": os.environ.get("MYSQL_TEST_DATABASE", "biblioteca_gof_teste"),
++        "database": banco,
+     }
+ 
+ 
+@@ -39,7 +42,9 @@
+     try:
+         executar_arquivo_sql({**parametros, "connection_timeout": 3}, RAIZ / "sql" / "schema.sql")
+     except mysql.connector.Error as erro:
+-        pytest.skip(f"MySQL indisponível para testes de integração: {erro.msg}")
++        if erro.errno in (2002, 2003, 2005):
++            pytest.skip(f"MySQL indisponível para testes de integração (código {erro.errno}).")
++        raise
+     return parametros
+ 
+ 
+--- a/tests/test_auditoria_boleto.py
++++ b/tests/test_auditoria_boleto.py
+@@ -0,0 +1,63 @@
++"""Regressão: segunda via concorrente não pode criar duas cobranças."""
++import threading
++from datetime import timedelta
++
++import pytest
++
++from tests.apoio import HOJE, emprestar, sistema_pronto
++
++
++@pytest.mark.parametrize("banco", ["A", "B"])
++def test_boleto_concorrente_emite_uma_cobranca_e_aceita_seu_pagamento(fabrica, configuracao, monkeypatch, banco):
++    configuracao.banco_cobranca = banco
++    sistema = sistema_pronto(fabrica)
++    emprestar(sistema)
++    emitir_real = sistema.cobranca.emitir_boleto
++
++    def banco_indisponivel(pedido):
++        raise ConnectionError("falha temporária do banco")
++
++    monkeypatch.setattr(sistema.cobranca, "emitir_boleto", banco_indisponivel)
++    sistema.fachada.devolver("L1", HOJE + timedelta(days=34))
++    multa = sistema.multa.listar()[0]
++    assert multa.id_boleto is None
++    emails_antes = len(sistema.email.caixa_de_saida)
++    encontro_no_banco = threading.Barrier(2)
++    largada = threading.Barrier(2)
++    emitidos, resultados, erros = [], [], []
++
++    def banco_lento(pedido):
++        # Sem exclusão, ambas as chamadas chegam ao banco antes de gravar.
++        # Com exclusão, só uma chega; o prazo libera a resposta sem deadlock.
++        try:
++            encontro_no_banco.wait(timeout=1)
++        except threading.BrokenBarrierError:
++            pass
++        boleto = emitir_real(pedido)
++        emitidos.append(boleto.id_boleto)
++        return boleto
++
++    monkeypatch.setattr(sistema.cobranca, "emitir_boleto", banco_lento)
++
++    def emitir():
++        try:
++            largada.wait(timeout=5)
++            resultados.append(sistema.servico_multa.emitir_boleto(multa.id).id_boleto)
++        except Exception as erro:
++            erros.append(erro)
++
++    threads = [threading.Thread(target=emitir, daemon=True) for _ in range(2)]
++    for thread in threads:
++        thread.start()
++    for thread in threads:
++        thread.join(timeout=10)
++
++    assert not any(thread.is_alive() for thread in threads)
++    assert erros == []
++    assert len(emitidos) == 1
++    assert resultados == [emitidos[0], emitidos[0]]
++    assert sistema.multa.listar()[0].id_boleto == emitidos[0]
++    assert len(sistema.email.caixa_de_saida) == emails_antes + 1
++    notificacao = sistema.cobranca.simular_pagamento(emitidos[0])
++    assert sistema.servico_multa.registrar_pagamento(notificacao) is True
++    assert sistema.servico_multa.registrar_pagamento(notificacao) is False
+--- a/tests/test_auditoria_cache.py
++++ b/tests/test_auditoria_cache.py
+@@ -0,0 +1,38 @@
++"""Metadados acompanham alterações confirmadas no acervo."""
++from dominio.consulta_decorator import ConsultaBase, ConsultaComCache, ConsultaComMedicao
++from dominio.tratadores import TratadorDeAcervo
++from tests.apoio import sistema_pronto
++
++
++def test_cache_atualiza_titulo_depois_da_edicao(fabrica):
++    sistema = sistema_pronto(fabrica)
++    assert sistema.acervo.consultar_metadados("L1").titulo == "Livro L1"
++    assert sistema.acervo.atualizar({"id": "L1", "titulo": "Título corrigido"}) is True
++    assert sistema.acervo.consultar_metadados("L1").titulo == "Título corrigido"
++    assert sistema.medicao.total_consultas == 2
++
++
++def test_cache_remove_livro_depois_da_exclusao(fabrica):
++    sistema = sistema_pronto(fabrica)
++    assert sistema.acervo.consultar_metadados("L1") is not None
++    assert sistema.acervo.excluir("L1") is True
++    assert sistema.acervo.consultar_metadados("L1") is None
++
++
++def test_falha_na_invalidacao_nao_impede_mutacao_confirmada(fabrica):
++    sistema = sistema_pronto(fabrica)
++    titulos_confirmados = []
++
++    class CacheComFalha(dict):
++        def pop(self, chave, padrao=None):
++            # Uma nova transação já deve enxergar a alteração ao invalidar.
++            titulos_confirmados.append(sistema.acervo.consultar("L1").titulo)
++            raise ConnectionError("cache indisponível para remoção")
++
++    consulta = ConsultaComMedicao(ConsultaComCache(ConsultaBase(fabrica), CacheComFalha()))
++    tratador = TratadorDeAcervo(fabrica, consulta)
++    assert tratador.consultar_metadados("L1").titulo == "Livro L1"
++    assert tratador.atualizar({"id": "L1", "titulo": "Título corrigido"}) is True
++    assert sistema.acervo.consultar("L1").titulo == "Título corrigido"
++    assert titulos_confirmados == ["Título corrigido"]
++    assert tratador.consultar_metadados("L1").titulo == "Título corrigido"
+--- a/tests/test_auditoria_integridade.py
++++ b/tests/test_auditoria_integridade.py
+@@ -0,0 +1,67 @@
++"""Regressões da auditoria: vínculos preservados e banco de testes protegido."""
++import pytest
++import mysql.connector
++
++from dominio.erros import ErroDominio
++from tests.apoio import ANA, BIA, HOJE, emprestar, sistema_pronto
++from tests import conftest
++
++
++@pytest.mark.parametrize("pessoa", [ANA, BIA])
++def test_pessoa_vinculada_nao_pode_ser_excluida(fabrica, pessoa):
++    sistema = sistema_pronto(fabrica)
++    if pessoa == BIA:
++        sistema.estudante.excluir("E2")  # Bia permanece vinculada somente como atendente.
++    with pytest.raises(ErroDominio):
++        sistema.pessoa.excluir(pessoa["cpf"])
++    assert sistema.pessoa.consultar(pessoa["cpf"]) is not None
++
++
++@pytest.mark.parametrize("fase", ["reserva", "emprestimo", "historico"])
++def test_estudante_com_movimentacao_nao_pode_ser_excluido(fabrica, fase):
++    sistema = sistema_pronto(fabrica)
++    sistema.fachada.reservar("E1", "L1")
++    if fase != "reserva":
++        sistema.fachada.emprestar("E1", "L1")
++    if fase == "historico":
++        sistema.fachada.devolver("L1", HOJE)
++    with pytest.raises(ErroDominio):
++        sistema.estudante.excluir("E1")
++    assert sistema.estudante.consultar("E1") is not None
++
++
++def test_livro_livre_com_historico_nao_pode_ser_excluido(fabrica):
++    sistema = sistema_pronto(fabrica)
++    emprestar(sistema)
++    sistema.fachada.devolver("L1", HOJE)
++    sistema.fachada.inspecionar("L1", True)
++    with pytest.raises(ErroDominio):
++        sistema.acervo.excluir("L1")
++    assert sistema.acervo.consultar("L1").nome_estado == "LIVRE"
++
++
++def test_exclusao_sem_vinculos_continua_permitida(fabrica):
++    sistema = sistema_pronto(fabrica)
++    sistema.estudante.excluir("E1")
++    sistema.pessoa.excluir(ANA["cpf"])
++    sistema.acervo.excluir("L1")
++    assert sistema.pessoa.consultar(ANA["cpf"]) is None
++    assert sistema.acervo.consultar("L1") is None
++
++
++def test_base_teste_nao_pode_ser_base_da_aplicacao(monkeypatch):
++    monkeypatch.setenv("MYSQL_DATABASE", "biblioteca_producao")
++    monkeypatch.setenv("MYSQL_TEST_DATABASE", "biblioteca_producao")
++    with pytest.raises(ValueError, match="MYSQL_TEST_DATABASE"):
++        conftest.parametros_mysql_teste()
++
++
++def test_erro_sql_de_bootstrap_nao_vira_skip(monkeypatch):
++    def falhar(*args, **kwargs):
++        raise mysql.connector.ProgrammingError("SQL inválido", errno=1064)
++    monkeypatch.setattr(conftest, "executar_arquivo_sql", falhar)
++    with pytest.raises(mysql.connector.ProgrammingError):
++        try:
++            conftest.mysql_preparado.__wrapped__()
++        except pytest.skip.Exception:
++            pytest.fail("Erro SQL não pode ser tratado como MySQL indisponível")
+--- a/tests/test_auditoria_observer.py
++++ b/tests/test_auditoria_observer.py
+@@ -0,0 +1,47 @@
++"""Regressões da auditoria: reentrega não duplica efeitos já confirmados."""
++from concurrent.futures import ThreadPoolExecutor
++from datetime import timedelta
++
++from dominio.devolucao_observer import OuvinteDevolucao
++from tests.apoio import HOJE, emprestar, sistema_pronto
++
++
++def test_reentrega_concorrente_nao_duplica_ouvintes(fabrica):
++    sistema = sistema_pronto(fabrica)
++    emprestar(sistema)
++    eventos = []
++
++    class Coletor(OuvinteDevolucao):
++        def notificar(self, evento):
++            eventos.append(evento)
++
++    sistema.publicador.registrar(Coletor())
++    sistema.fachada.devolver("L1", HOJE + timedelta(days=35))
++    with ThreadPoolExecutor(max_workers=8) as pool:
++        list(pool.map(sistema.publicador.publicar, [eventos[0]] * 8))
++    assert sistema.inspecao.pendentes == ["L1"]
++    assert sistema.indicadores.devolucoes == 1
++    assert sistema.indicadores.dias_de_atraso == 5
++    assert len(sistema.multa.listar()) == 1
++    assert len(sistema.email.caixa_de_saida) == 2
++    assert len(eventos) == 1
++
++
++def test_reentrega_tenta_novamente_apenas_ouvinte_que_falhou(fabrica):
++    sistema = sistema_pronto(fabrica)
++    emprestar(sistema)
++    eventos = []
++
++    class Instavel(OuvinteDevolucao):
++        def notificar(self, evento):
++            eventos.append(evento)
++            if len(eventos) == 1:
++                raise ConnectionError("falha transitória antes do efeito")
++
++    sistema.publicador.registrar(Instavel())
++    sistema.fachada.devolver("L1", HOJE + timedelta(days=30))
++    sistema.publicador.publicar(eventos[0])
++    sistema.publicador.publicar(eventos[0])
++    assert len(eventos) == 2
++    assert sistema.indicadores.devolucoes == 1
++    assert len(sistema.email.caixa_de_saida) == 1
+--- a/tests/test_auditoria_processos.py
++++ b/tests/test_auditoria_processos.py
+@@ -0,0 +1,44 @@
++"""Comando idempotente e persistência entre processos Python realmente distintos."""
++import json
++import os
++import subprocess
++import sys
++import uuid
++from concurrent.futures import ThreadPoolExecutor
++from datetime import timedelta
++
++from tests.apoio import HOJE, emprestar, livro_no_banco, sistema_pronto
++
++FILHO = """
++import json, sys
++from config import parametros_mysql
++from dominio.persistencia_factory import FabricaMySQL
++from dominio.configuracao_singleton import ConfiguracaoSistema
++from dominio.tratadores import montar_sistema
++s = montar_sistema(FabricaMySQL(parametros_mysql()), ConfiguracaoSistema.obter_instancia())
++c = s.emprestimo.renovar_emprestimo('E1', 'L1', 'auditoria', sys.argv[1])
++print(c.para_texto())
++"""
++
++
++def test_mysql_mesmo_comando_em_quatro_processos_renova_uma_vez(fabrica_mysql, mysql_preparado):
++    sistema = sistema_pronto(fabrica_mysql)
++    emprestar(sistema)
++    ambiente = os.environ.copy()
++    for campo in ('host', 'port', 'user', 'password', 'database'):
++        ambiente['MYSQL_' + campo.upper()] = str(mysql_preparado[campo])
++    ambiente['PYTHONDONTWRITEBYTECODE'] = '1'
++    identificador = str(uuid.uuid4())
++
++    def executar(_):
++        resultado = subprocess.run([sys.executable, '-B', '-c', FILHO, identificador],
++                                   env=ambiente, capture_output=True, text=True, timeout=20)
++        assert resultado.returncode == 0, resultado.stderr
++        return json.loads(resultado.stdout)
++
++    with ThreadPoolExecutor(max_workers=4) as pool:
++        respostas = list(pool.map(executar, range(4)))
++    assert all(resposta == respostas[0] for resposta in respostas)
++    livro = livro_no_banco(fabrica_mysql)
++    assert livro.num_renovacoes == 1
++    assert livro.vencimento == HOJE + timedelta(days=60)

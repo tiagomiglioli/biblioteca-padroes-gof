@@ -38,6 +38,8 @@ def texto_comprovante(comprovante):
     texto = f"{comprovante.mensagem} Livro {comprovante.livro_id}: {comprovante.estado}."
     if comprovante.vencimento:
         texto += f" Vencimento: {comprovante.vencimento:%d/%m/%Y}."
+    if comprovante.atendente_id:
+        texto += f" Atendente: {comprovante.atendente_id}."
     return texto
 
 
@@ -146,12 +148,13 @@ def operacoes_de_circulacao(f, autor):
     """Cada opção do formulário aponta para UM método de tratador. Sem regra de negócio aqui."""
     s = sistema()
     estudante, livro, solicitacao = f.get("estudante_id", ""), f.get("livro_id", ""), f.get("id_solicitacao")
+    atendente = f.get("atendente_id", "").strip()
     return {
-        "reservar": lambda: s.emprestimo.solicitar_reserva(estudante, livro, autor, solicitacao),
+        "reservar": lambda: s.emprestimo.solicitar_reserva(estudante, livro, autor, solicitacao, atendente_id=atendente),
         "consultar_reserva": lambda: s.emprestimo.consultar_reserva(estudante, livro),
-        "emprestar": lambda: s.emprestimo.realizar_emprestimo(estudante, livro),
+        "emprestar": lambda: s.emprestimo.realizar_emprestimo(estudante, livro, atendente_id=atendente),
         "renovar": lambda: s.emprestimo.renovar_emprestimo(estudante, livro, autor, solicitacao),
-        "devolver": lambda: s.devolucao.registrar_devolucao(livro, data_do_formulario(f.get("data_devolucao"))),
+        "devolver": lambda: s.devolucao.registrar_devolucao(livro, data_do_formulario(f.get("data_devolucao")), atendente_id=atendente),
         "inspecionar_bom": lambda: s.devolucao.inspecionar(livro, True),
         "inspecionar_danificado": lambda: s.devolucao.inspecionar(livro, False),
         "enviar_reparo": lambda: s.devolucao.enviar_para_reparo(livro),
@@ -173,7 +176,7 @@ def circulacao():
     # O id da solicitação nasce com o formulário: reenviar o mesmo formulário
     # (duplo clique, F5) repete o mesmo id e o Command não executa de novo.
     return render_template("circulacao.html", livros=s.acervo.listar(), estudantes=s.estudante.listar(),
-                           id_solicitacao=str(uuid.uuid4()), hoje=date.today().isoformat())
+                           id_solicitacao=str(uuid.uuid4()), hoje=date.today().isoformat(), atendentes=s.atendente.listar())
 
 
 # ------------------------------------------------------------------- multas

@@ -1,0 +1,55 @@
+{
+  "versao": [
+    [
+      "9.4.0"
+    ]
+  ],
+  "livro": [
+    [
+      "L-AUD",
+      "LIVRE",
+      1,
+      "2027-01-12"
+    ]
+  ],
+  "reserva": [
+    [
+      "L-AUD",
+      "E-AUD",
+      0
+    ]
+  ],
+  "emprestimo": [
+    [
+      "L-AUD",
+      "E-AUD",
+      "2026-11-13",
+      "2027-01-17"
+    ]
+  ],
+  "multa": [
+    [
+      "E-AUD",
+      5,
+      "5.00",
+      "original",
+      1,
+      "A"
+    ]
+  ],
+  "quitacoes": [
+    [
+      1
+    ]
+  ],
+  "comandos": [
+    [
+      "reserva",
+      1
+    ],
+    [
+      "renovacao",
+      1
+    ]
+  ]
+}

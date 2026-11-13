@@ -32,10 +32,16 @@
     <label>Estudante
       <select name="estudante_id">{% for estudante in estudantes %}<option value="{{ estudante.id }}">{{ estudante.id }}</option>{% endfor %}</select>
     </label>
+    <label>Atendente responsável
+      <select name="atendente_id">
+        <option value="">Selecione o atendente</option>
+        {% for atendente in atendentes %}<option value="{{ atendente.id }}">{{ atendente.id }}</option>{% endfor %}
+      </select>
+    </label>
     <label>Data da devolução <input type="date" name="data_devolucao" value="{{ hoje }}"></label>
     <div class="botoes"><button type="submit">Executar</button></div>
   </form>
-  <p class="apoio">A data da devolução só é usada em “Registrar devolução”. Informe uma data depois do vencimento para demonstrar atraso e multa.</p>
+  <p class="apoio">Reserva, empréstimo e devolução exigem atendente cadastrado de uma pessoa diferente do estudante. A data da devolução só é usada em “Registrar devolução”. Informe uma data depois do vencimento para demonstrar atraso e multa.</p>
 </section>
 
 <section class="cartao">

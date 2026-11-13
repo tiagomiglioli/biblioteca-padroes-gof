@@ -16,7 +16,7 @@ def renovacao(sistema, id=None):
 
 def test_r06_solicitacao_tem_identificador_autor_instante_e_execucao(fabrica):
     sistema = sistema_pronto(fabrica)
-    comando = ComandoReserva(sistema.fachada, "E1", "L1", autor="ana")
+    comando = ComandoReserva(sistema.fachada, "E1", "L1", autor="ana", atendente_id="A1")
 
     assert uuid.UUID(comando.id)
     assert comando.autor == "ana"
@@ -79,7 +79,7 @@ def test_r06_submissoes_simultaneas_do_mesmo_identificador_executam_uma_unica_ve
 
 def test_r06_reserva_repetida_com_o_mesmo_identificador_nao_e_refeita(fabrica):
     sistema = sistema_pronto(fabrica)
-    comando = ComandoReserva(sistema.fachada, "E1", "L1", autor="ana")
+    comando = ComandoReserva(sistema.fachada, "E1", "L1", autor="ana", atendente_id="A1")
 
     primeiro = sistema.executor.executar(comando)
     segundo = sistema.executor.executar(comando)       # sem idempotência, o State recusaria
@@ -91,7 +91,7 @@ def test_r06_reserva_repetida_com_o_mesmo_identificador_nao_e_refeita(fabrica):
 def test_r06_identificador_que_nao_e_uuid_e_recusado(fabrica):
     sistema = sistema_pronto(fabrica)
     with pytest.raises(ErroDominio):
-        ComandoReserva(sistema.fachada, "E1", "L1", autor="ana", id="'; DROP TABLE livro; --")
+        ComandoReserva(sistema.fachada, "E1", "L1", autor="ana", id="'; DROP TABLE livro; --", atendente_id="A1")
 
 
 def test_r06_solicitacao_recusada_nao_fica_registrada_como_executada(fabrica):

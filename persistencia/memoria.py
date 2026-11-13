@@ -7,6 +7,7 @@ import copy
 import threading
 
 from dominio.entidades import Emprestimo, Multa, Reserva
+from dominio.erros import ErroDominio
 from dominio.pontos_acesso import Acervo, Financeiro, Movimentacao, Relacionamento
 from persistencia.unidade_trabalho import UnidadeTrabalhoMemoria
 
@@ -61,6 +62,9 @@ class AcervoMemoria(_RepositorioMemoria, Acervo):
         self._guardar("livros", livro.id, livro)
 
     def excluir(self, livro_id):
+        if any(item.livro_id == livro_id for tabela in ("reservas", "emprestimos")
+               for item in self._tabela(tabela).values()):
+            raise ErroDominio("Operação recusada: o registro tem vínculos com outros cadastros.")
         self._tabela("livros").pop(livro_id, None)
         self._tabela("itens").pop(livro_id, None)
 
@@ -85,22 +89,22 @@ class AcervoMemoria(_RepositorioMemoria, Acervo):
 class MovimentacaoMemoria(_RepositorioMemoria, Movimentacao):
     """GoF Abstract Factory — ProdutoConcreto (memória): repositório de Movimentacao."""
 
-    def inserir_reserva(self, livro_id, estudante_id, data):
-        reserva = Reserva(self._banco.proximo_id(), livro_id, estudante_id, data)
+    def inserir_reserva(self, livro_id, estudante_id, data, atendente_id):
+        reserva = Reserva(self._banco.proximo_id(), livro_id, estudante_id, data, atendente_id)
         self._guardar("reservas", reserva.id, reserva)
         return reserva
 
     def consultar_reserva(self, livro_id, estudante_id):
         for reserva in self._todos("reservas"):
-            if (reserva.livro_id, reserva.estudante_id) == (livro_id, estudante_id):
+            if reserva.ativa and (reserva.livro_id, reserva.estudante_id) == (livro_id, estudante_id):
                 return reserva
         return None
 
     def remover_reserva(self, reserva_id):
-        del self._tabela("reservas")[reserva_id]
+        self._tabela("reservas")[reserva_id].ativa = False
 
-    def inserir_emprestimo(self, livro_id, estudante_id, data):
-        emprestimo = Emprestimo(self._banco.proximo_id(), livro_id, estudante_id, data)
+    def inserir_emprestimo(self, livro_id, estudante_id, data, atendente_id):
+        emprestimo = Emprestimo(self._banco.proximo_id(), livro_id, estudante_id, data, atendente_id=atendente_id)
         self._guardar("emprestimos", emprestimo.id, emprestimo)
         return emprestimo
 
@@ -110,8 +114,10 @@ class MovimentacaoMemoria(_RepositorioMemoria, Movimentacao):
                 return emprestimo
         return None
 
-    def registrar_devolucao(self, emprestimo_id, data):
-        self._tabela("emprestimos")[emprestimo_id].data_devolucao = data
+    def registrar_devolucao(self, emprestimo_id, data, atendente_id):
+        emprestimo = self._tabela("emprestimos")[emprestimo_id]
+        emprestimo.data_devolucao = data
+        emprestimo.atendente_devolucao_id = atendente_id
 
     def registrar_comando(self, comando_id, tipo, autor, criado_em):
         if comando_id in self._tabela("comandos"):
@@ -139,6 +145,9 @@ class RelacionamentoMemoria(_RepositorioMemoria, Relacionamento):
         self._guardar("pessoas", pessoa.cpf, pessoa)
 
     def excluir_pessoa(self, cpf):
+        if any(item.cpf == cpf for tabela in ("estudantes", "atendentes")
+               for item in self._tabela(tabela).values()):
+            raise ErroDominio("Operação recusada: o registro tem vínculos com outros cadastros.")
         self._tabela("pessoas").pop(cpf, None)
 
     def listar_pessoas(self):
@@ -147,13 +156,22 @@ class RelacionamentoMemoria(_RepositorioMemoria, Relacionamento):
     def inserir_estudante(self, estudante):
         self._guardar("estudantes", estudante.id, estudante)
 
-    def obter_estudante(self, estudante_id):
+    def obter_estudante(self, estudante_id, para_atualizar=False):
         return self._ler("estudantes", estudante_id)
 
     def atualizar_estudante(self, estudante):
+        atual = self.obter_estudante(estudante.id)
+        if atual and atual.cpf != estudante.cpf and any(
+            item.estudante_id == estudante.id for tabela in ("reservas", "emprestimos", "multas")
+            for item in self._tabela(tabela).values()
+        ):
+            raise ErroDominio("Não é permitido trocar a Pessoa de estudante com movimentações.")
         self._guardar("estudantes", estudante.id, estudante)
 
     def excluir_estudante(self, estudante_id):
+        if any(item.estudante_id == estudante_id for tabela in ("reservas", "emprestimos", "multas")
+               for item in self._tabela(tabela).values()):
+            raise ErroDominio("Operação recusada: o registro tem vínculos com outros cadastros.")
         self._tabela("estudantes").pop(estudante_id, None)
 
     def listar_estudantes(self):
@@ -162,13 +180,23 @@ class RelacionamentoMemoria(_RepositorioMemoria, Relacionamento):
     def inserir_atendente(self, atendente):
         self._guardar("atendentes", atendente.id, atendente)
 
-    def obter_atendente(self, atendente_id):
+    def obter_atendente(self, atendente_id, para_atualizar=False):
         return self._ler("atendentes", atendente_id)
 
     def atualizar_atendente(self, atendente):
+        atual = self.obter_atendente(atendente.id)
+        if atual and atual.cpf != atendente.cpf and self._atendente_usado(atendente.id):
+            raise ErroDominio("Não é permitido trocar a Pessoa de atendente com movimentações.")
         self._guardar("atendentes", atendente.id, atendente)
 
+    def _atendente_usado(self, atendente_id):
+        return (any(item.atendente_id == atendente_id for item in self._tabela("reservas").values())
+                or any(atendente_id in (item.atendente_id, item.atendente_devolucao_id)
+                       for item in self._tabela("emprestimos").values()))
+
     def excluir_atendente(self, atendente_id):
+        if self._atendente_usado(atendente_id):
+            raise ErroDominio("Operação recusada: o registro tem vínculos com outros cadastros.")
         self._tabela("atendentes").pop(atendente_id, None)
 
     def listar_atendentes(self):
@@ -189,7 +217,7 @@ class FinanceiroMemoria(_RepositorioMemoria, Financeiro):
         self._guardar("multas", multa.id, multa)
         return multa
 
-    def obter_multa(self, multa_id):
+    def obter_multa(self, multa_id, para_atualizar=False):
         return self._ler("multas", multa_id)
 
     def _primeira(self, condicao):

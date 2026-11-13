@@ -44,11 +44,11 @@ def test_r09_a_ordem_da_cadeia_importa(fabrica):
 def test_r09_resultado_antigo_do_cache_nunca_autoriza_reserva(fabrica):
     sistema = sistema_pronto(fabrica)
     antes = sistema.acervo.consultar_metadados("L1")            # entra no cache com o livro LIVRE
-    sistema.fachada.reservar("E1", "L1")                        # o livro deixa de estar LIVRE
+    sistema.fachada.reservar("E1", "L1", atendente_id="A1")                        # o livro deixa de estar LIVRE
 
     assert sistema.acervo.consultar_metadados("L1") == antes    # o cache continua respondendo
     with pytest.raises(ErroDominio):
-        sistema.fachada.reservar("E2", "L1")                    # a reserva olha o estado atual
+        sistema.fachada.reservar("E2", "L1", atendente_id="A1")                    # a reserva olha o estado atual
 
     assert livro_no_banco(fabrica).nome_estado == "RESERVADO"
 

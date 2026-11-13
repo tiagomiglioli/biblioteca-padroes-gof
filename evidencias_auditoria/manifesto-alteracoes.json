@@ -1,0 +1,67 @@
+[
+  {
+    "path": "dominio/consulta_decorator.py",
+    "before": "9d8392dbcaae8e88b379a61fd3e87275c8f772ec7758a5b2aca603cdf83e46fe",
+    "after": "f580ed6b0f50110119fc684598aed85416fe785fe2417d45193dc33fb2acc32b"
+  },
+  {
+    "path": "dominio/devolucao_observer.py",
+    "before": "b11aa5c34e59b7290690340090c889b25caee22e23e293eddb4d56e4b522aaeb",
+    "after": "e849ce1ffa687f1ee87ed23c8e38eab1f3cf686003e0f132c56c742ea8eb36f6"
+  },
+  {
+    "path": "dominio/multas_strategy.py",
+    "before": "b01801a8596d1acdb638c1d4ffeb8f6fea1d0f1bf584a1f79349a8ad369f2fe7",
+    "after": "69cb385b0567839726e029d5c328b71163d8364deb9fae7b2736e90e3b61b622"
+  },
+  {
+    "path": "dominio/pontos_acesso.py",
+    "before": "9761fef9c69df77e85e7dc00e877e954e59f2a9780d2e7b9f58e57aea6b97d6e",
+    "after": "2867a47c963c60d267505ff61b10a339b8a7a32eae76cd0ec301bae87509f4bb"
+  },
+  {
+    "path": "dominio/tratadores.py",
+    "before": "95bdb6acf95bfcf36c20ca9d9d7c529c03cb0aade2e946debe3f1318bfd5ea3d",
+    "after": "a9f4885adb0b6d0ef670138d5f388f7f2f5c93d2bb181ac9d088da24c30bdc58"
+  },
+  {
+    "path": "persistencia/memoria.py",
+    "before": "414479d67e772b2539c56f0f6d41be7de8cb7ad65c8d859c76ace01682c13327",
+    "after": "c4d06abbf396208d26f7b20721254d4ec264c5e9bbe749f711739ebc8d5afe5a"
+  },
+  {
+    "path": "persistencia/mysql.py",
+    "before": "e7f4630e4404a8f0a967432eb73005035e08a0a3a05705c9b15296ef7c75af4b",
+    "after": "583540ba191a4330e21afc8dad1dd1b0169030d7c84e83f1dfecf6580737c5a5"
+  },
+  {
+    "path": "tests/conftest.py",
+    "before": "340f7aa21f1da701435752344c69a355439d683a91ef5055668730941455d939",
+    "after": "180f175311587cba7845426d1079c2860022dd6eb65eacc2f05f9134962cfb8d"
+  },
+  {
+    "path": "tests/test_auditoria_boleto.py",
+    "before": null,
+    "after": "20c38879cf928fe6723345616e75adb46a320280eddc53b080be7360ff82828f"
+  },
+  {
+    "path": "tests/test_auditoria_cache.py",
+    "before": null,
+    "after": "659b9b584f64c4627b52cbc8294d942de5b863671e3217a8446d656456dc2b29"
+  },
+  {
+    "path": "tests/test_auditoria_integridade.py",
+    "before": null,
+    "after": "c4c9fe7f0d76dbe5af1537cd98882bc4cfe72b54f6720437b7ba0bef71317766"
+  },
+  {
+    "path": "tests/test_auditoria_observer.py",
+    "before": null,
+    "after": "82e1c78ddd0559028ce8078a67c8abf4935236ea5bf8d2877a240ecc469667d6"
+  },
+  {
+    "path": "tests/test_auditoria_processos.py",
+    "before": null,
+    "after": "9b5baf22c13cc5c4f1ec51455f76f4f6523b94f032060d13342e22804c40bd24"
+  }
+]

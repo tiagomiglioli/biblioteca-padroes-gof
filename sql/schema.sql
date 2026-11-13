@@ -51,6 +51,8 @@ CREATE TABLE IF NOT EXISTS reserva (
     estudante_id  VARCHAR(20) NOT NULL,
     data          DATE        NOT NULL,
     ativa         TINYINT(1)  NOT NULL DEFAULT 1,
+    atendente_id  VARCHAR(20) NULL,
+    CONSTRAINT fk_reserva_atendente FOREIGN KEY (atendente_id) REFERENCES atendente (id),
     CONSTRAINT fk_reserva_livro FOREIGN KEY (livro_id) REFERENCES livro (id),
     CONSTRAINT fk_reserva_estudante FOREIGN KEY (estudante_id) REFERENCES estudante (id)
 ) ENGINE=InnoDB;
@@ -62,6 +64,10 @@ CREATE TABLE IF NOT EXISTS emprestimo (
     estudante_id     VARCHAR(20) NOT NULL,
     data_emprestimo  DATE        NOT NULL,
     data_devolucao   DATE        NULL,
+    atendente_id     VARCHAR(20) NULL,
+    atendente_devolucao_id VARCHAR(20) NULL,
+    CONSTRAINT fk_emprestimo_atendente FOREIGN KEY (atendente_id) REFERENCES atendente (id),
+    CONSTRAINT fk_devolucao_atendente FOREIGN KEY (atendente_devolucao_id) REFERENCES atendente (id),
     CONSTRAINT fk_emprestimo_livro FOREIGN KEY (livro_id) REFERENCES livro (id),
     CONSTRAINT fk_emprestimo_estudante FOREIGN KEY (estudante_id) REFERENCES estudante (id)
 ) ENGINE=InnoDB;

@@ -18,13 +18,14 @@ class Comando(ABC):
 
     tipo = ""
 
-    def __init__(self, fachada, estudante_id, livro_id, autor, id=None, criado_em=None):
+    def __init__(self, fachada, estudante_id, livro_id, autor, id=None, criado_em=None, atendente_id=None):
         try:
             self.id = str(uuid.UUID(id)) if id else str(uuid.uuid4())
         except ValueError:
             raise ErroDominio("Identificador de solicitação inválido.") from None
         self.autor = autor
         self.criado_em = criado_em or datetime.now()
+        self.atendente_id = atendente_id
         self.estudante_id = estudante_id
         self.livro_id = livro_id
         self._fachada = fachada
@@ -40,7 +41,7 @@ class ComandoReserva(Comando):
     tipo = "reserva"
 
     def executar(self, uow):
-        return self._fachada.reservar(self.estudante_id, self.livro_id, uow)
+        return self._fachada.reservar(self.estudante_id, self.livro_id, uow, atendente_id=self.atendente_id)
 
 
 class ComandoRenovacao(Comando):
