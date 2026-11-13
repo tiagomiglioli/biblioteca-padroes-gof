@@ -10,14 +10,17 @@ from datetime import date
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from dominio.acervo_composite import ItemLivro, montar_arvore, mover
 from dominio.bancos_adapter import criar_cobranca
 from dominio.cadastros_template import (CadastroAtendente, CadastroEstudante, CadastroLivro,
                                          CadastroPessoa, campo, campo_cpf, exigir)
 from dominio.circulacao_command import ComandoRenovacao, ComandoReserva, ExecutorComandos
 from dominio.circulacao_facade import CirculacaoFacade
+from dominio.consulta_decorator import ConsultaBase, ConsultaComCache, ConsultaComMedicao
 from dominio.devolucao_observer import (OuvinteEmail, OuvinteIndicadores, OuvinteInspecao,
                                          OuvinteMulta, PublicadorDevolucao, ServicoEmail)
 from dominio.entidades import Usuario
+from dominio.erros import ErroDominio
 from dominio.multas_strategy import POLITICAS, ServicoMulta, politica_por_nome
 
 
@@ -152,7 +155,11 @@ class TratadorDeAtendente(_TratadorBase, iAtendente):
 
 
 class TratadorDeAcervo(_TratadorBase, iLivro):
-    """Manter Livro (regras 1.1 a 1.4), delegando ao Acervo."""
+    """Manter Livro (regras 1.1 a 1.4), delegando ao Acervo; consulta e organização do acervo."""
+
+    def __init__(self, fabrica, consulta):
+        super().__init__(fabrica)
+        self._consulta = consulta          # cadeia de decoradores montada na inicialização (R09)
 
     def inserir(self, dados):
         return CadastroLivro(self._fabrica).incluir(dados)
@@ -186,6 +193,38 @@ class TratadorDeAcervo(_TratadorBase, iLivro):
 
     def listar(self):
         return self._no_acervo(lambda acervo: acervo.listar())
+
+    def consultar_metadados(self, livro_id):
+        """Consulta só de leitura (pode vir do cache). Nunca decide reserva."""
+        return self._consulta.consultar(livro_id)
+
+    def criar_grupo(self, nome, pai_id):
+        """Cria unidade (pai_id None), seção ou subseção. Devolve o id do grupo."""
+        exigir(nome.strip(), "Nome do grupo é obrigatório.")
+
+        def operacao(acervo):
+            _, grupos, _ = montar_arvore(acervo.listar_grupos(), acervo.listar_itens())
+            exigir(pai_id is None or pai_id in grupos, "Grupo pai não encontrado.")
+            return acervo.inserir_grupo(nome.strip(), pai_id)
+        return self._no_acervo(operacao)
+
+    def mover_livro(self, livro_id, grupo_id):
+        """Coloca (ou move) o livro no grupo. Só a árvore muda: Livro e Movimentacao não são tocados."""
+        def operacao(acervo):
+            _, grupos, itens = montar_arvore(acervo.listar_grupos(), acervo.listar_itens())
+            if acervo.obter(livro_id) is None or grupo_id not in grupos:
+                raise ErroDominio("Livro ou grupo não encontrado.")
+            # As regras (ciclo, livro em dois grupos) são conferidas pelo Composite antes de gravar.
+            if livro_id in itens:
+                mover(itens[livro_id], grupos[grupo_id])
+            else:
+                grupos[grupo_id].adicionar(ItemLivro(livro_id))
+            acervo.definir_grupo(livro_id, grupo_id)
+        self._no_acervo(operacao)
+
+    def arvore(self):
+        """Raiz do Composite, para exibir a hierarquia e as contagens."""
+        return self._no_acervo(lambda acervo: montar_arvore(acervo.listar_grupos(), acervo.listar_itens())[0])
 
 
 class TratadorDeEmprestimo:
@@ -308,6 +347,7 @@ class Sistema:
     email: ServicoEmail
     inspecao: OuvinteInspecao
     indicadores: OuvinteIndicadores
+    medicao: ConsultaComMedicao
     emprestimo: TratadorDeEmprestimo
     devolucao: TratadorDeDevolucao
     acervo: TratadorDeAcervo
@@ -332,12 +372,15 @@ def montar_sistema(fabrica, configuracao, relogio=date.today):
 
     fachada = CirculacaoFacade(fabrica, publicador, relogio)
     executor = ExecutorComandos(fabrica)
+    # Cadeia de decoradores da instalação: medição por fora, para medir também
+    # as consultas atendidas pelo cache. Trocar a ordem muda o que é medido.
+    medicao = ConsultaComMedicao(ConsultaComCache(ConsultaBase(fabrica)))
     return Sistema(
         fachada=fachada, executor=executor, publicador=publicador, servico_multa=servico_multa,
-        cobranca=cobranca, email=email, inspecao=inspecao, indicadores=indicadores,
+        cobranca=cobranca, email=email, inspecao=inspecao, indicadores=indicadores, medicao=medicao,
         emprestimo=TratadorDeEmprestimo(fachada, executor),
         devolucao=TratadorDeDevolucao(fachada, servico_multa),
-        acervo=TratadorDeAcervo(fabrica), pessoa=TratadorDePessoa(fabrica),
+        acervo=TratadorDeAcervo(fabrica, medicao), pessoa=TratadorDePessoa(fabrica),
         estudante=TratadorDeEstudante(fabrica), atendente=TratadorDeAtendente(fabrica),
         multa=TratadorDeMulta(fabrica, servico_multa, cobranca, configuracao),
         acesso=TratadorDeAcesso(fabrica),
