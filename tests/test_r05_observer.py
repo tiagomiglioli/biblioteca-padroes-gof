@@ -106,3 +106,22 @@ def test_r05_email_de_devolucao_vai_para_a_caixa_de_saida_simulada(fabrica):
     emprestar(sistema)
     sistema.fachada.devolver("L1", VENCIMENTO)
     assert sistema.email.caixa_de_saida[-1][0] == ANA["email"]
+
+
+def test_r05_mesmo_evento_entregue_duas_vezes_gera_uma_unica_multa(fabrica):
+    sistema = sistema_pronto(fabrica)
+    emprestar(sistema)
+    recebidos = []
+
+    class Coletor(OuvinteDevolucao):
+        def notificar(self, evento):
+            recebidos.append(evento)
+
+    sistema.publicador.registrar(Coletor())
+    sistema.fachada.devolver("L1", VENCIMENTO + timedelta(days=4))
+
+    repetida = sistema.servico_multa.emitir_multa(recebidos[0])
+
+    multas = sistema.multa.listar()
+    assert len(multas) == 1
+    assert (repetida.id, repetida.id_boleto) == (multas[0].id, multas[0].id_boleto)

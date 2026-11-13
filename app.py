@@ -52,6 +52,9 @@ def criar_app(config_extra=None, fabrica=None, relogio=date.today):
     return app
 
 
+create_app = criar_app       # nome que o comando `flask --app app ...` procura
+
+
 def registrar_comandos(app):
     """Comandos de preparação: flask --app app init-db | seed-demo | criar-usuario."""
 

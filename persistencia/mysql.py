@@ -90,6 +90,8 @@ def _multa(linha):
     return Multa(linha[0], linha[1], linha[2], linha[3], linha[4], linha[5], bool(linha[6]), linha[7], linha[8])
 
 
+# Listas de colunas são constantes do código. Só elas entram por f-string nos comandos;
+# todo valor vindo do usuário entra como parâmetro %s.
 COLUNAS_LIVRO = "id, titulo, estado, num_renovacoes, vencimento"
 COLUNAS_MULTA = "id, emprestimo_id, estudante_id, dias_atraso, valor, politica, quitada, banco, id_boleto"
 
