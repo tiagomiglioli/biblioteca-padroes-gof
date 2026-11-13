@@ -1,5 +1,6 @@
 """Entidades e comprovantes do domínio da biblioteca."""
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass
 from datetime import date
 from decimal import Decimal
 
@@ -126,3 +127,16 @@ class Comprovante:
     estado: str
     vencimento: date | None
     mensagem: str
+
+    def para_texto(self):
+        """Texto guardado junto ao id da solicitação, para repetir a mesma resposta (R06)."""
+        dados = asdict(self)
+        dados["vencimento"] = self.vencimento.isoformat() if self.vencimento else None
+        return json.dumps(dados)
+
+    @classmethod
+    def de_texto(cls, texto):
+        dados = json.loads(texto)
+        if dados["vencimento"]:
+            dados["vencimento"] = date.fromisoformat(dados["vencimento"])
+        return cls(**dados)
