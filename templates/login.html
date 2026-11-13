@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block titulo %}Entrar{% endblock %}
+{% block conteudo %}
+<section class="cartao login">
+  <h2>Biblioteca</h2>
+  <p class="apoio">Gestão de empréstimos de livros</p>
+  <form method="post" action="{{ url_for('acesso.login') }}">
+    {{ csrf() }}
+    <label for="login">Login</label>
+    <input id="login" name="login" required autofocus autocomplete="username">
+    <label for="senha">Senha</label>
+    <input id="senha" name="senha" type="password" required autocomplete="current-password">
+    <button type="submit">Entrar</button>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block titulo %}Painel{% endblock %}
+{% block conteudo %}
+<h2>Painel</h2>
+<div class="grade">
+  <section class="cartao numero"><strong>{{ total_livros }}</strong><span>livros no acervo</span></section>
+  <section class="cartao numero"><strong>{{ por_estado.get('DEVOLVIDO', 0) }}</strong><span>aguardando inspeção</span></section>
+  <section class="cartao numero"><strong>{{ multas_pendentes }}</strong><span>multas pendentes</span></section>
+  <section class="cartao numero"><strong>{{ indicadores.devolucoes }}</strong><span>devoluções nesta execução</span></section>
+  <section class="cartao numero"><strong>{{ indicadores.atrasadas }}</strong><span>devoluções atrasadas</span></section>
+  <section class="cartao numero"><strong>{{ medicao.total_consultas }}</strong><span>consultas ao acervo medidas</span></section>
+</div>
+
+<section class="cartao">
+  <h3>Livros por estado</h3>
+  <table>
+    <thead><tr><th>Estado</th><th>Quantidade</th></tr></thead>
+    <tbody>
+    {% for estado, quantidade in por_estado|dictsort %}
+      <tr><td><span class="estado {{ estado|lower }}">{{ estado }}</span></td><td>{{ quantidade }}</td></tr>
+    {% else %}
+      <tr><td colspan="2" class="vazio">Nenhum livro cadastrado. Comece em <a href="{{ url_for('paginas.cadastros') }}">Cadastros</a>.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="cartao">
+  <h3>Operações</h3>
+  <p class="atalhos">
+    <a class="botao" href="{{ url_for('paginas.cadastros') }}">Cadastrar</a>
+    <a class="botao" href="{{ url_for('paginas.acervo') }}">Consultar acervo</a>
+    <a class="botao" href="{{ url_for('paginas.circulacao') }}">Reservar, emprestar e devolver</a>
+    <a class="botao" href="{{ url_for('paginas.multas') }}">Ver multas</a>
+  </p>
+</section>
+{% endblock %}

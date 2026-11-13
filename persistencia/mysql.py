@@ -3,6 +3,10 @@
 Todo SQL é parametrizado (%s): nenhum dado do usuário é concatenado no comando.
 Nenhum repositório faz commit: quem confirma ou desfaz é a unidade de trabalho.
 """
+import re
+from pathlib import Path
+
+import mysql.connector
 from mysql.connector import errorcode
 from mysql.connector.errors import IntegrityError
 
@@ -13,6 +17,26 @@ from dominio.pontos_acesso import Acervo, Financeiro, Movimentacao, Relacionamen
 from persistencia.unidade_trabalho import UnidadeTrabalhoMySQL
 
 VINCULOS = (errorcode.ER_ROW_IS_REFERENCED_2, errorcode.ER_NO_REFERENCED_ROW_2)
+
+
+def executar_arquivo_sql(parametros, caminho):
+    """Cria o banco (se faltar) e executa os comandos de um arquivo .sql, separados por ';'."""
+    parametros = dict(parametros)
+    banco = parametros.pop("database")
+    # Nome de banco não aceita parâmetro %s; por isso só letras, números e '_' são aceitos.
+    if not re.fullmatch(r"\w+", banco):
+        raise ErroDominio("Nome de banco inválido em MYSQL_DATABASE.")
+    conexao = mysql.connector.connect(**parametros)
+    try:
+        cursor = conexao.cursor()
+        cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{banco}` CHARACTER SET utf8mb4")
+        cursor.execute(f"USE `{banco}`")
+        for comando in Path(caminho).read_text(encoding="utf-8").split(";"):
+            if comando.strip():
+                cursor.execute(comando)
+        conexao.commit()
+    finally:
+        conexao.close()
 
 
 class _RepositorioMySQL:

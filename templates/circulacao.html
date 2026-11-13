@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block titulo %}Circulação{% endblock %}
+{% block conteudo %}
+<h2>Circulação</h2>
+
+<section class="cartao">
+  <h3>Nova operação</h3>
+  <form method="post" action="{{ url_for('paginas.circulacao') }}" class="linha">
+    {{ csrf() }}
+    <input type="hidden" name="id_solicitacao" value="{{ id_solicitacao }}">
+    <label>Operação
+      <select name="operacao" required>
+        <optgroup label="Estudante">
+          <option value="reservar">Reservar</option>
+          <option value="consultar_reserva">Consultar reserva</option>
+          <option value="emprestar">Efetivar empréstimo</option>
+          <option value="renovar">Renovar (+30 dias)</option>
+        </optgroup>
+        <optgroup label="Atendente">
+          <option value="devolver">Registrar devolução</option>
+          <option value="inspecionar_bom">Inspeção: bom estado</option>
+          <option value="inspecionar_danificado">Inspeção: danificado</option>
+          <option value="enviar_reparo">Enviar para reparo</option>
+          <option value="retornar_reparo">Retornar do reparo</option>
+          <option value="laudo_irrecuperavel">Laudo irrecuperável</option>
+        </optgroup>
+      </select>
+    </label>
+    <label>Livro
+      <select name="livro_id" required>{% for livro in livros %}<option value="{{ livro.id }}">{{ livro.id }} — {{ livro.titulo }} ({{ livro.nome_estado }})</option>{% endfor %}</select>
+    </label>
+    <label>Estudante
+      <select name="estudante_id">{% for estudante in estudantes %}<option value="{{ estudante.id }}">{{ estudante.id }}</option>{% endfor %}</select>
+    </label>
+    <label>Data da devolução <input type="date" name="data_devolucao" value="{{ hoje }}"></label>
+    <div class="botoes"><button type="submit">Executar</button></div>
+  </form>
+  <p class="apoio">A data da devolução só é usada em “Registrar devolução”. Informe uma data depois do vencimento para demonstrar atraso e multa.</p>
+</section>
+
+<section class="cartao">
+  <h3>Situação dos livros</h3>
+  <table>
+    <thead><tr><th>Identificador</th><th>Título</th><th>Estado</th><th>Vencimento</th><th>Renovações</th></tr></thead>
+    <tbody>
+    {% for livro in livros %}
+      {% set em_emprestimo = livro.nome_estado in ('EMPRESTADO', 'RENOVADO') %}
+      <tr><td>{{ livro.id }}</td><td>{{ livro.titulo }}</td>
+          <td><span class="estado {{ livro.nome_estado|lower }}">{{ livro.nome_estado }}</span></td>
+          <td>{{ livro.vencimento|data_br if em_emprestimo else '—' }}</td>
+          <td>{{ livro.num_renovacoes if em_emprestimo else '—' }}</td></tr>
+    {% else %}<tr><td colspan="5" class="vazio">Nenhum livro cadastrado.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

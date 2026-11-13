@@ -320,6 +320,8 @@ class TratadorDeMulta(_TratadorBase):
 class TratadorDeAcesso(_TratadorBase):
     """Login da interface web: só o hash da senha é guardado e comparado."""
 
+    _HASH_FALSO = generate_password_hash("senha-que-ninguem-usa")
+
     def criar_usuario(self, login, senha):
         exigir(login.strip() and len(senha) >= 8, "Informe o login e uma senha de pelo menos 8 caracteres.")
         usuario = Usuario(login.strip(), generate_password_hash(senha))
@@ -328,9 +330,9 @@ class TratadorDeAcesso(_TratadorBase):
     def autenticar(self, login, senha):
         """Devolve o Usuario se login e senha conferem; senão None (sem dizer qual dos dois errou)."""
         usuario = self.obter(login)
-        if usuario is not None and check_password_hash(usuario.senha_hash, senha):
-            return usuario
-        return None
+        # Mesmo sem usuário, um hash é conferido: o tempo de resposta não revela se o login existe.
+        confere = check_password_hash(usuario.senha_hash if usuario else self._HASH_FALSO, senha)
+        return usuario if usuario is not None and confere else None
 
     def obter(self, login):
         return self._no_relacionamento(lambda rel: rel.obter_usuario(login))

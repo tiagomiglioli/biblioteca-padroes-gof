@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block titulo %}Cadastros{% endblock %}
+
+{% macro excluir(tipo, campo, valor) %}
+<form method="post" action="{{ url_for('paginas.cadastrar', tipo=tipo) }}" data-confirmar="Excluir {{ valor }}?">
+  {{ csrf() }}<input type="hidden" name="acao" value="excluir"><input type="hidden" name="{{ campo }}" value="{{ valor }}">
+  <button type="submit" class="secundario">Excluir</button>
+</form>
+{% endmacro %}
+
+{% macro botoes() %}
+<div class="botoes">
+  <button type="submit" name="acao" value="inserir">Incluir</button>
+  <button type="submit" name="acao" value="atualizar" class="secundario">Atualizar</button>
+</div>
+{% endmacro %}
+
+{% block conteudo %}
+<h2>Cadastros</h2>
+<p class="apoio">Estudante e atendente só podem ser cadastrados para uma pessoa já existente.</p>
+
+<section class="cartao">
+  <h3>Pessoas</h3>
+  <form method="post" action="{{ url_for('paginas.cadastrar', tipo='pessoa') }}" class="linha">
+    {{ csrf() }}
+    <label>CPF <input name="cpf" required inputmode="numeric" maxlength="14" placeholder="11122233344"></label>
+    <label>Nome <input name="nome" required maxlength="80"></label>
+    <label>Sobrenome <input name="sobrenome" required maxlength="80"></label>
+    <label>E-mail <input name="email" type="email" required maxlength="120"></label>
+    {{ botoes() }}
+  </form>
+  <table>
+    <thead><tr><th>CPF</th><th>Nome</th><th>E-mail</th><th></th></tr></thead>
+    <tbody>
+    {% for pessoa in pessoas %}
+      <tr><td>{{ pessoa.cpf }}</td><td>{{ pessoa.nome }} {{ pessoa.sobrenome }}</td><td>{{ pessoa.email }}</td>
+          <td>{{ excluir('pessoa', 'cpf', pessoa.cpf) }}</td></tr>
+    {% else %}<tr><td colspan="4" class="vazio">Nenhuma pessoa cadastrada.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+{% for tipo, titulo, registros in [('estudante', 'Estudantes', estudantes), ('atendente', 'Atendentes', atendentes)] %}
+<section class="cartao">
+  <h3>{{ titulo }}</h3>
+  <form method="post" action="{{ url_for('paginas.cadastrar', tipo=tipo) }}" class="linha">
+    {{ csrf() }}
+    <label>Identificador <input name="id" required maxlength="20"></label>
+    <label>CPF da pessoa
+      <select name="cpf" required>
+        {% for pessoa in pessoas %}<option value="{{ pessoa.cpf }}">{{ pessoa.cpf }} — {{ pessoa.nome }}</option>{% endfor %}
+      </select>
+    </label>
+    {{ botoes() }}
+  </form>
+  <table>
+    <thead><tr><th>Identificador</th><th>CPF</th><th></th></tr></thead>
+    <tbody>
+    {% for registro in registros %}
+      <tr><td>{{ registro.id }}</td><td>{{ registro.cpf }}</td><td>{{ excluir(tipo, 'id', registro.id) }}</td></tr>
+    {% else %}<tr><td colspan="3" class="vazio">Nenhum registro.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endfor %}
+
+<section class="cartao">
+  <h3>Livros</h3>
+  <form method="post" action="{{ url_for('paginas.cadastrar', tipo='livro') }}" class="linha">
+    {{ csrf() }}
+    <label>Identificador <input name="id" required maxlength="20"></label>
+    <label>Título <input name="titulo" required maxlength="200"></label>
+    {{ botoes() }}
+  </form>
+  <table>
+    <thead><tr><th>Identificador</th><th>Título</th><th>Estado</th><th></th></tr></thead>
+    <tbody>
+    {% for livro in livros %}
+      <tr><td>{{ livro.id }}</td><td>{{ livro.titulo }}</td>
+          <td><span class="estado {{ livro.nome_estado|lower }}">{{ livro.nome_estado }}</span></td>
+          <td>{{ excluir('livro', 'id', livro.id) }}</td></tr>
+    {% else %}<tr><td colspan="4" class="vazio">Nenhum livro cadastrado.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

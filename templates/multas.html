@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block titulo %}Multas{% endblock %}
+{% block conteudo %}
+<h2>Multas</h2>
+
+<section class="cartao">
+  <h3>Política de multa vigente</h3>
+  <form method="post" action="{{ url_for('paginas.definir_politica') }}" class="linha">
+    {{ csrf() }}
+    <label>Política
+      <select name="politica">
+        {% for nome in politicas %}<option value="{{ nome }}" {{ 'selected' if nome == vigente }}>{{ nome }}</option>{% endfor %}
+      </select>
+    </label>
+    <div class="botoes"><button type="submit">Aplicar</button></div>
+  </form>
+  <p class="apoio">original: R$ 1,00 por dia · teto: no máximo R$ 20,00 · tolerancia: 2 primeiros dias sem cobrança. A troca vale para as próximas multas; as já emitidas não mudam.</p>
+</section>
+
+<section class="cartao">
+  <h3>Multas emitidas</h3>
+  <table>
+    <thead><tr><th>Nº</th><th>Estudante</th><th>Dias de atraso</th><th>Valor</th><th>Política</th><th>Boleto</th><th>Situação</th><th></th></tr></thead>
+    <tbody>
+    {% for multa in multas %}
+      <tr>
+        <td>{{ multa.id }}</td><td>{{ multa.estudante_id }}</td><td>{{ multa.dias_atraso }}</td>
+        <td>{{ multa.valor|reais }}</td><td>{{ multa.politica }}</td>
+        <td>{% if multa.id_boleto %}Banco {{ multa.banco }} · {{ multa.id_boleto }}{% else %}não emitido{% endif %}</td>
+        <td><span class="estado {{ 'livre' if multa.quitada else 'devolvido' }}">{{ 'Quitada' if multa.quitada else 'Pendente' }}</span></td>
+        <td class="acoes">
+          <form method="post" action="{{ url_for('paginas.segunda_via', multa_id=multa.id) }}">{{ csrf() }}<button type="submit" class="secundario">Boleto (2ª via)</button></form>
+          <form method="post" action="{{ url_for('paginas.simular_pagamento', multa_id=multa.id) }}">{{ csrf() }}<button type="submit">Simular pagamento no banco</button></form>
+        </td>
+      </tr>
+    {% else %}<tr><td colspan="8" class="vazio">Nenhuma multa emitida.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

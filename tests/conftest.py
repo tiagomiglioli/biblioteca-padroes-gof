@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 from dominio.configuracao_singleton import ConfiguracaoSistema
 from dominio.persistencia_factory import FabricaMemoria, FabricaMySQL
+from persistencia.mysql import executar_arquivo_sql
 
 load_dotenv()
 
@@ -35,20 +36,11 @@ def mysql_preparado():
     """Cria o banco de teste e aplica sql/schema.sql; pula se o MySQL não responder."""
     import mysql.connector
     parametros = parametros_mysql_teste()
-    banco = parametros.pop("database")
     try:
-        conexao = mysql.connector.connect(**parametros, connection_timeout=3)
+        executar_arquivo_sql({**parametros, "connection_timeout": 3}, RAIZ / "sql" / "schema.sql")
     except mysql.connector.Error as erro:
         pytest.skip(f"MySQL indisponível para testes de integração: {erro.msg}")
-    cursor = conexao.cursor()
-    cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{banco}`")
-    cursor.execute(f"USE `{banco}`")
-    for comando in (RAIZ / "sql" / "schema.sql").read_text(encoding="utf-8").split(";"):
-        if comando.strip():
-            cursor.execute(comando)
-    conexao.commit()
-    conexao.close()
-    return {**parametros, "database": banco}
+    return parametros
 
 
 @pytest.fixture

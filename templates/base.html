@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Biblioteca{% endblock %} · Biblioteca GoF</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+{% macro csrf() %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endmacro %}
+{% if current_user.is_authenticated %}
+  <nav class="menu">
+    <h1>Biblioteca</h1>
+    {% for rota, rotulo in [('paginas.painel', 'Painel'), ('paginas.cadastros', 'Cadastros'),
+                            ('paginas.acervo', 'Acervo'), ('paginas.circulacao', 'Circulação'),
+                            ('paginas.multas', 'Multas')] %}
+      <a href="{{ url_for(rota) }}" {% if request.endpoint == rota %}class="ativo" aria-current="page"{% endif %}>{{ rotulo }}</a>
+    {% endfor %}
+    <form method="post" action="{{ url_for('acesso.logout') }}" class="sair">
+      {{ csrf() }}
+      <span>{{ current_user.id }}</span>
+      <button type="submit" class="secundario">Sair</button>
+    </form>
+  </nav>
+{% endif %}
+  <main class="{{ 'com-menu' if current_user.is_authenticated else 'sem-menu' }}">
+    {% for categoria, mensagem in get_flashed_messages(with_categories=true) %}
+      <p class="aviso {{ categoria }}" role="{{ 'alert' if categoria == 'erro' else 'status' }}">{{ mensagem }}</p>
+    {% endfor %}
+    {% block conteudo %}{% endblock %}
+  </main>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
